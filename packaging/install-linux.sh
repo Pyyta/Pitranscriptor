@@ -13,9 +13,15 @@ if [ -e "$target" ] || [ -L "$target" ]; then
     printf 'Destination already exists: %s\n' "$target" >&2
     exit 1
 fi
-mkdir -- "$target"
-cp -R -- "$source_dir/Pitranscriptor/." "$target/"
-chmod u+x "$target/Pitranscriptor"
+stage=$(mktemp -d -- "$parent/.pitranscriptor.XXXXXX")
+trap 'if [ -d "$stage" ]; then rm -rf -- "$stage"; fi' EXIT
+cp -R -- "$source_dir/Pitranscriptor/." "$stage/"
+chmod u+x "$stage/Pitranscriptor"
+mv -T -n -- "$stage" "$target"
+if [ -d "$stage" ]; then
+    printf 'Destination already exists: %s\n' "$target" >&2
+    exit 1
+fi
 
 if [ "$#" -eq 0 ]; then
     launcher_dir=${XDG_DATA_HOME:-$HOME/.local/share}/applications

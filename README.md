@@ -2,7 +2,7 @@
 
 Aplicación de escritorio en desarrollo para crear y editar subtítulos dinámicos en videos cortos. Creada por **sudo_pita**.
 
-> Estado: editor de escritorio en desarrollo. Permite transcribir con un modelo local, editar fragmentos y estilos sobre el video, guardar proyectos y exportar MP4, MOV, SRT y WebVTT. Los instaladores están pendientes.
+> Estado: prototipo de escritorio con transcripción local, edición de fragmentos y estilos, proyectos y exportación MP4, MOV, SRT y WebVTT. Hay instrucciones para construir instaladores de prueba en Windows y Linux.
 
 Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte para videos verticales y horizontales de hasta cinco minutos. Su prioridad es transcribir español e inglés, especialmente cuando se mezclan términos tecnológicos, y permitir corregir cada palabra y personalizar cada fragmento.
 

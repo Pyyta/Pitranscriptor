@@ -22,7 +22,7 @@
 
 La fase 1 dispone de la preparación técnica y un conjunto inicial validado de cuatro referencias revisadas. La ampliación de condiciones e idiomas y la comparación de modelos corresponden a fase 2. Evidencia y decisiones en la [memoria](memoria-proyecto.md); procedimiento en [pruebas de reconocimiento](pruebas-reconocimiento.md).
 
-La fase 2 tiene un ensayo con/sin pistas sobre la muestra inicial y una línea base sin pistas sobre cuatro referencias revisadas, con el mismo modelo small en CPU. No se considera terminada: faltan modelos comparables, referencias más independientes del motor evaluado, otras condiciones de audio e idiomas y validación de GPU cuando sea viable.
+La primera ronda de fase 2 compara tres modelos en CPU y dos en RTX 3050. Faltan referencias independientes y cobertura de más voces, inglés completo y ruido real. Las fases 3 a 6 tienen un prototipo integrado con transcripción, edición de fragmentos, estilos, proyectos y exportación de video y texto. En fase 7 se incorporaron revisión de posibles muletillas y hablantes manuales. La diarización y el modo conectado siguen en evaluación. En fase 8 hay compilaciones de prueba para Windows y Ubuntu. Quedan la verificación de escritorio en más sistemas y la revisión de redistribución antes de publicar binarios.
 
 ## Pruebas de aceptación
 
