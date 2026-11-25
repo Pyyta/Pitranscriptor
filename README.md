@@ -8,6 +8,7 @@ Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte par
 
 ## Documentación
 
+- [Memoria del proyecto y requisitos RF/RNF](docs/memoria-proyecto.md)
 - [Requisitos y comportamiento](docs/requisitos.md)
 - [Arquitectura y decisiones técnicas](docs/arquitectura.md)
 - [Plan de trabajo y pruebas](docs/plan.md)
