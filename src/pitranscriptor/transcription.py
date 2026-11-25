@@ -63,6 +63,8 @@ def transcribe_project(
         raise ValueError("Selecciona una carpeta con un modelo CTranslate2 completo")
     if device not in ("cpu", "cuda"):
         raise ValueError("Dispositivo de reconocimiento inválido")
+    if cancelled():
+        raise InterruptedError("Transcripción cancelada")
     progress(0)
     model = WhisperModel(
         str(model_dir.resolve()),
@@ -70,6 +72,8 @@ def transcribe_project(
         compute_type="int8" if device == "cpu" else "int8_float16",
         local_files_only=True,
     )
+    if cancelled():
+        raise InterruptedError("Transcripción cancelada")
     words = []
     last_end = 0
     try:

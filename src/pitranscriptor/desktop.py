@@ -1,9 +1,11 @@
 """Editor de subtítulos de escritorio."""
 
 import argparse
+import io
 import json
 import os
 import sys
+import wave
 from bisect import bisect_right
 from dataclasses import asdict, replace
 from fractions import Fraction
@@ -46,6 +48,9 @@ from pitranscriptor.subtitles import Cue, Style, Word, render_subtitles
 from pitranscriptor.transcription import inspect_media, transcribe_project
 from pitranscriptor.video_export import export_video
 from pitranscriptor.waveform import audio_peaks
+
+FILLERS = {"eh", "em", "mmm", "hmm", "uh", "um", "eee"}
+SPEAKER_COLORS = ("#ffffff", "#a9e8ff", "#ffdc86", "#c9f3a7", "#f7b3dc", "#dac4ff")
 
 
 def timestamp(ms: int) -> str:
@@ -268,6 +273,8 @@ class Editor(QMainWindow):
             edit, self.t("Guardar estilo como preset…", "Save style preset…"), self.save_preset
         )
         self._action(edit, self.t("Aplicar preset…", "Apply preset…"), self.apply_preset)
+        self._action(edit, self.t("Revisar muletillas…", "Review fillers…"), self.review_fillers)
+        self._action(edit, self.t("Colorear por hablante", "Color by speaker"), self.color_speakers)
         help_menu = self.menuBar().addMenu(self.t("Ayuda", "Help"))
         self._action(help_menu, self.t("Acerca de", "About"), self.about)
         language = self.menuBar().addMenu(self.t("Idioma", "Language"))
@@ -1196,6 +1203,73 @@ class Editor(QMainWindow):
             if ok:
                 self.splice(self.list.currentRow(), 1, [replace(cue, style=Style(**presets[name]))])
 
+    def review_fillers(self):
+        if self.project is None or self.job is not None:
+            return
+        options = {}
+        for index, cue in enumerate(self.project.cues):
+            for token in cue.text.split():
+                plain = "".join(char for char in token.casefold() if char.isalpha())
+                if plain in FILLERS:
+                    options[f"{index + 1}. {timestamp(cue.start_ms)} · {token} · {cue.text}"] = (
+                        index
+                    )
+        if not options:
+            self.statusBar().showMessage(
+                self.t("Sin posibles muletillas en la lista.", "No likely fillers found.")
+            )
+            return
+        selection, ok = QInputDialog.getItem(
+            self,
+            "Pitranscriptor",
+            self.t(
+                "Posibles muletillas. Elige un fragmento para revisarlo.",
+                "Possible fillers. Select a caption to review.",
+            ),
+            list(options),
+            0,
+            False,
+        )
+        if ok:
+            self.list.setCurrentRow(options[selection])
+            self.text.setFocus()
+
+    def color_speakers(self):
+        if self.project is None or self.job is not None:
+            return
+        speakers = list(dict.fromkeys(cue.speaker for cue in self.project.cues if cue.speaker))
+        if not speakers:
+            self.statusBar().showMessage(
+                self.t(
+                    "Asigna hablantes a los fragmentos primero.",
+                    "Assign speakers to captions first.",
+                )
+            )
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Pitranscriptor",
+                self.t(
+                    "¿Actualizar el color de texto de todos los fragmentos con hablante?",
+                    "Update text color for all captions with a speaker?",
+                ),
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        colors = {
+            speaker: SPEAKER_COLORS[index % len(SPEAKER_COLORS)]
+            for index, speaker in enumerate(speakers)
+        }
+        cues = tuple(
+            replace(cue, style=replace(cue.style, color=colors[cue.speaker]))
+            if cue.speaker
+            else cue
+            for cue in self.project.cues
+        )
+        self.commit(self.project.with_cues(cues), self.list.currentRow())
+
 
 def configure_application(app):
     app.setStyle("Fusion")
@@ -1235,7 +1309,13 @@ def main(argv=None):
             return 1
         av.Codec("libx264", "w")
         av.Codec("aac", "w")
-        return 0 if not editor.grab().isNull() and faster_whisper.audio.decode_audio else 1
+        clip = io.BytesIO()
+        with wave.open(clip, "wb") as audio:
+            audio.setparams((1, 2, 16_000, 0, "NONE", "not compressed"))
+            audio.writeframes(bytes(3200))
+        clip.seek(0)
+        decoded = faster_whisper.audio.decode_audio(clip)
+        return 0 if not editor.grab().isNull() and len(decoded) == 1600 else 1
     editor.show()
     if args.project:
         editor.load_path(args.project)
