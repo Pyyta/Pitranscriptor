@@ -118,3 +118,4 @@ El siguiente trabajo es preparar las muestras propias autorizadas y validar reco
 ## Núcleo de subtítulos
 
 - El usuario pide continuar todas las tareas autorizadas sin solicitar decisiones rutinarias. El núcleo usa el modelo instalado mediante faster-whisper en CPU, mantiene el límite de siete palabras y guarda tiempos, estilos independientes y referencia al medio en un JSON portable. La copia local de la primera grabación generó doce fragmentos y se exportó en SRT y WebVTT. El medio y las exportaciones se mantienen en local.
+- Editor de escritorio disponible con video, forma de onda, estilos por fragmento, presets, operaciones de edición, tiempos por palabra, deshacer y rehacer. Se comprobó reproducción vertical, selección, estilo independiente y recuperación de cambios en Windows. Las etiquetas del editor se ofrecen en español e inglés. La asignación de hablantes es manual y la salida de texto seguirá el estándar correspondiente.

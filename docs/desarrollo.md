@@ -9,10 +9,10 @@ El núcleo de preparación usa solo la biblioteca estándar. Extras separados:
 | Grupo | Dependencias directas fijadas | Propósito actual |
 | --- | --- | --- |
 | `dev` | pytest 9.2.0, Ruff 0.17.6, Hatchling 1.33.0 | Pruebas, revisión y construcción Python |
-| `desktop` | PySide6-Essentials 6.12.0 | Evaluar Qt Widgets sin instalar módulos no utilizados |
+| `desktop` | PySide6-Essentials y PySide6-Addons 6.12.0 | Editor Qt Widgets y reproducción Qt Multimedia |
 | `research` | faster-whisper 1.2.1, CTranslate2 4.9.1, PyAV 18.1.1 | Preparar y decodificar audio para evaluar el motor local |
 
-`uv.lock` fija también versiones transitivas y hashes. No editarlo a mano. `uv lock` lo actualiza después de un cambio deliberado; `uv sync --locked` rechaza un archivo desactualizado. El extra `desktop` no contiene aún QtMultimedia; se revisará antes de implementar reproducción. No se ha seleccionado un modelo predeterminado.
+`uv.lock` fija también versiones transitivas y hashes. No editarlo a mano. `uv lock` lo actualiza después de un cambio deliberado y `uv sync --locked` rechaza un archivo desactualizado. El editor usa el extra `desktop` para reproducción y `research` para audio y reconocimiento.
 
 PyAV se fija por compatibilidad: faster-whisper 1.2.1 pasa `metadata_errors` a `av.open`, argumento retirado en PyAV 19. Se verificó el fallo y se eligió 18.1.1 con wheels para Windows/Linux. [Incidencia del motor](https://github.com/SYSTRAN/faster-whisper/issues/1589). Las pruebas opcionales ahora decodifican WAV con el motor además de importar bibliotecas; no requieren modelos.
 
@@ -73,6 +73,8 @@ uv run --frozen pitranscriptor export-subtitles outputs/video.pitranscriptor out
 ```
 
 Los tiempos por palabra son estimaciones del modelo. Si la cantidad de palabras cambia al editar un fragmento, se conservan los tiempos del fragmento y se retiran las marcas individuales para evitar atribuir precisión a palabras nuevas. La decodificación considera el desfase inicial de la primera pista de audio frente al video. El material con discontinuidades complejas requiere comprobación manual de sincronía.
+
+Para abrir el editor, ejecutar `uv sync --locked --all-extras` y luego `uv run --frozen --all-extras pitranscriptor-desktop`. Elegir el video y seleccionar una carpeta de modelo instalado mediante **Modelo…**. Los fragmentos se pueden editar desde la lista, mover arrastrando en la vista previa pausada y guardar como proyecto. La línea de tiempo muestra forma de onda y admite búsqueda, zoom y velocidades de reproducción. Se puede cambiar el idioma desde el menú para el próximo inicio.
 
 ## Matriz inicial, objetivos y evidencia
 

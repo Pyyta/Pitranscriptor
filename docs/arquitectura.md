@@ -2,7 +2,7 @@
 
 Estas son decisiones iniciales, no compatibilidades ya comprobadas. Se definirán versiones exactas tras prototipos y pruebas en Windows y Linux.
 
-La fase 1 incorpora una base Python con dependencias fijadas en `pyproject.toml` y `uv.lock`. El núcleo ya transcribe con un modelo local, genera fragmentos de siete palabras como máximo, guarda proyectos JSON versionados y exporta SRT y WebVTT. El editor visual y la exportación de video se validan por separado. Véase [desarrollo](desarrollo.md).
+La fase 1 incorpora una base Python con dependencias fijadas en `pyproject.toml` y `uv.lock`. El núcleo local transcribe, genera fragmentos de siete palabras como máximo, guarda proyectos JSON versionados y exporta SRT y WebVTT. El editor usa Qt Multimedia para reproducir, QPainter para componer y PyAV para obtener la forma de onda. Véase [desarrollo](desarrollo.md).
 
 ## Tecnología candidata
 

@@ -18,16 +18,16 @@ def inspect_media(source: Path, *, require_video: bool = False) -> tuple[int, in
         with source.open("rb") as media, av.open(media) as container:
             if require_video and not container.streams.video:
                 raise ValueError("El archivo no contiene una pista de video")
-            if not container.streams.audio:
+            if not container.streams.audio and not require_video:
                 raise ValueError("El archivo no contiene una pista de audio")
             if container.duration is None:
                 raise ValueError("No se pudo determinar la duración del archivo")
             duration = (container.duration + 999) // 1000
             if not 0 < duration <= MAX_MEDIA_MS:
                 raise ValueError("El medio debe durar entre 0 y 300 segundos")
-            audio = container.streams.audio[0]
-            if not container.streams.video:
+            if not container.streams.video or not container.streams.audio:
                 return duration, 0
+            audio = container.streams.audio[0]
             video = container.streams.video[0]
             offset = 0
             if all(stream.start_time is not None and stream.time_base for stream in (audio, video)):
