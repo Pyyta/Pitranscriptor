@@ -1,8 +1,10 @@
 """Reconocimiento con un modelo ya instalado y marcas por palabra."""
 
 from collections.abc import Callable
+from math import isfinite
 from pathlib import Path
 
+from pitranscriptor.cuda_runtime import prepare_cuda
 from pitranscriptor.models import model_ready
 from pitranscriptor.project import Project
 from pitranscriptor.subtitles import MAX_MEDIA_MS, Word, fragment_words
@@ -40,6 +42,18 @@ def inspect_media(source: Path, *, require_video: bool = False) -> tuple[int, in
         raise ValueError("No se pudo abrir el medio con los códecs disponibles") from error
 
 
+def recognition_confidence(value: float | None) -> float | None:
+    """Convertir el escalar del motor al tipo del proyecto y omitir valores inválidos."""
+    if value is None:
+        return None
+    confidence = float(value)
+    if not isfinite(confidence):
+        return None
+    if -1e-6 <= confidence <= 1 + 1e-6:
+        return min(1.0, max(0.0, confidence))
+    return None
+
+
 def transcribe_project(
     source: Path,
     model_dir: Path,
@@ -68,6 +82,8 @@ def transcribe_project(
     if cancelled():
         raise InterruptedError("Transcripción cancelada")
     progress(0)
+    if device == "cuda":
+        prepare_cuda()
     model = WhisperModel(
         str(model_dir.resolve()),
         device=device,
@@ -130,7 +146,9 @@ def transcribe_project(
                     for index, token in enumerate(tokens):
                         first = start + (end - start) * index // len(tokens)
                         last = start + (end - start) * (index + 1) // len(tokens)
-                        words.append(Word(token, first, last, word.probability))
+                        words.append(
+                            Word(token, first, last, recognition_confidence(word.probability))
+                        )
                     last_end = end
                 progress(min(99, last_end * 100 // duration))
     except av.FFmpegError as error:

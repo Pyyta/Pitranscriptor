@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFontComboBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -44,8 +45,10 @@ from PySide6.QtWidgets import (
 from pitranscriptor.models import download_small, model_ready
 from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
+from pitranscriptor.retro_theme import GRID, PLAYHEAD, STYLESHEET, TIMECODE, TRACE, WORKSPACE
 from pitranscriptor.subtitles import Cue, Style, render_subtitles
-from pitranscriptor.transcription import inspect_media, transcribe_project
+from pitranscriptor.transcription import inspect_media
+from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
 from pitranscriptor.video_export import export_video
 from pitranscriptor.waveform import audio_peaks
 
@@ -87,6 +90,7 @@ class Preview(QWidget):
         self.position = 0
         self.drag = None
         self.editable = False
+        self.empty_text = ""
 
     def set_frame(self, frame):
         if frame.isValid():
@@ -95,7 +99,7 @@ class Preview(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#131921"))
+        painter.fillRect(self.rect(), QColor(WORKSPACE))
         self.bounds = QRectF(self.rect())
         if not self.frame.isNull():
             size = self.frame.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio)
@@ -106,6 +110,14 @@ class Preview(QWidget):
                 size.height(),
             )
             painter.drawImage(self.bounds, self.frame)
+        elif self.empty_text:
+            painter.setPen(QColor(GRID))
+            for x in range(0, self.width(), 20):
+                painter.drawLine(x, 0, x, self.height())
+            for y in range(0, self.height(), 20):
+                painter.drawLine(0, y, self.width(), y)
+            painter.setPen(QColor(TIMECODE))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.empty_text)
         if self.cue is not None:
             cue = self.cue
             if self.drag is not None:
@@ -154,14 +166,19 @@ class Timeline(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#26323d"))
+        painter.fillRect(self.rect(), QColor(WORKSPACE))
         start, span = self.viewport()
         width = self.width()
+        painter.setPen(QColor(GRID))
+        for x in range(0, width, max(1, width // 10)):
+            painter.drawLine(x, 0, x, 77)
+        for y in (28, 48, 78):
+            painter.drawLine(0, y, width, y)
         for index, peak in enumerate(self.peaks):
             x = round((index * self.duration / len(self.peaks) - start) * width / span)
             if 0 <= x <= width:
                 level = round(peak * 18)
-                painter.setPen(QColor("#70b4aa"))
+                painter.setPen(QColor(TRACE))
                 painter.drawLine(x, 28 - level, x, 28 + level)
         for index, cue in enumerate(self.cues):
             left = (cue.start_ms - start) * width / span
@@ -169,7 +186,7 @@ class Timeline(QWidget):
             if right <= 0 or left >= width:
                 continue
             box = QRectF(left, 52, max(1, right - left - 1), 23)
-            painter.fillRect(box, QColor("#ffd178" if index == self.selection else "#618cad"))
+            painter.fillRect(box, QColor(PLAYHEAD if index == self.selection else "#92acc2"))
             if box.width() > 44:
                 painter.setPen(QColor("#111820"))
                 painter.drawText(
@@ -179,12 +196,12 @@ class Timeline(QWidget):
                         cue.text, Qt.TextElideMode.ElideRight, int(box.width() - 7)
                     ),
                 )
-        painter.setPen(QColor("#c8d6df"))
+        painter.setPen(QColor(TIMECODE))
         painter.drawText(5, 90, timestamp(round(start)))
         last = timestamp(round(start + span))
         painter.drawText(width - 5 - painter.fontMetrics().horizontalAdvance(last), 90, last)
         playhead = round((self.position - start) * width / span)
-        painter.setPen(QPen(QColor("#f9f1ce"), 2))
+        painter.setPen(QPen(QColor(PLAYHEAD), 2))
         painter.drawLine(playhead, 0, playhead, 78)
 
     def mousePressEvent(self, event):
@@ -301,9 +318,18 @@ class Editor(QMainWindow):
 
     def _build_ui(self):
         central = QWidget()
+        central.setObjectName("desk")
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        toolbar = QHBoxLayout()
+        layout.setContentsMargins(9, 8, 9, 7)
+        layout.setSpacing(7)
+        brand = QLabel("PITRANSCRIPTOR")
+        brand.setObjectName("brand")
+        layout.addWidget(brand)
+        tray = QWidget()
+        tray.setObjectName("commandTray")
+        toolbar = QHBoxLayout(tray)
+        toolbar.setContentsMargins(7, 6, 7, 6)
         toolbar.addWidget(self._button(self.t("Abrir video", "Open video"), self.open_video))
         toolbar.addWidget(self._button(self.t("Modelo…", "Model…"), self.choose_model))
         self.language_mode = self._combo(
@@ -319,6 +345,7 @@ class Editor(QMainWindow):
         toolbar.addWidget(self.target)
         toolbar.addWidget(self._button(self.t("Pistas…", "Hints…"), self.choose_prompt))
         self.transcribe_button = self._button(self.t("Transcribir", "Transcribe"), self.transcribe)
+        self.transcribe_button.setObjectName("primary")
         toolbar.addWidget(self.transcribe_button)
         self.cancel_button = self._button(self.t("Cancelar", "Cancel"), self.cancel_job)
         self.cancel_button.setEnabled(False)
@@ -328,7 +355,7 @@ class Editor(QMainWindow):
         self.progress.hide()
         toolbar.addWidget(self.progress)
         toolbar.addStretch()
-        layout.addLayout(toolbar)
+        layout.addWidget(tray)
         storage = QStandardPaths.writableLocation(
             QStandardPaths.StandardLocation.AppLocalDataLocation
         )
@@ -343,14 +370,22 @@ class Editor(QMainWindow):
         split = QSplitter()
         layout.addWidget(split, 1)
         video = QWidget()
+        video.setObjectName("workPanel")
         video_layout = QVBoxLayout(video)
-        video_layout.setContentsMargins(0, 0, 0, 0)
-        video_layout.addWidget(self.preview, 1)
+        video_layout.setContentsMargins(7, 7, 7, 7)
+        video_layout.setSpacing(5)
+        video_layout.addWidget(self.panel_title(self.t("Monitor", "Monitor")))
+        self.media_name = QLabel()
+        self.media_name.setObjectName("mediaName")
+        video_layout.addWidget(self.media_name)
+        video_layout.addWidget(self.inset(self.preview, "monitor"), 1)
         playback = QHBoxLayout()
         self.play = self._button(self.t("Reproducir", "Play"), self.toggle_play)
         self.play.setMinimumWidth(100)
         playback.addWidget(self.play)
         self.time_label = QLabel()
+        self.time_label.setObjectName("timeCode")
+        self.time_label.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         playback.addWidget(self.time_label)
         speed = self._combo([(f"{rate:g}×", rate) for rate in (0.5, 0.75, 1.0, 1.25, 1.5, 2.0)])
         speed.setCurrentIndex(2)
@@ -362,12 +397,16 @@ class Editor(QMainWindow):
         playback.addWidget(QLabel("Zoom"))
         playback.addWidget(zoom)
         video_layout.addLayout(playback)
-        video_layout.addWidget(self.timeline)
+        video_layout.addWidget(self.panel_title(self.t("Línea de tiempo", "Timeline")))
+        video_layout.addWidget(self.inset(self.timeline, "track"))
         split.addWidget(video)
 
         side = QWidget()
+        side.setObjectName("workPanel")
         side_layout = QVBoxLayout(side)
-        side_layout.addWidget(QLabel(self.t("Fragmentos", "Captions")))
+        side_layout.setContentsMargins(7, 7, 7, 7)
+        side_layout.setSpacing(5)
+        side_layout.addWidget(self.panel_title(self.t("Fragmentos", "Captions")))
         self.list = QListWidget()
         self.list.currentRowChanged.connect(self.select_cue)
         side_layout.addWidget(self.list, 1)
@@ -382,6 +421,7 @@ class Editor(QMainWindow):
             buttons.addWidget(self._button(label, action))
         side_layout.addLayout(buttons)
         fields = QWidget()
+        fields.setObjectName("inspector")
         form = QFormLayout(fields)
         self.text = QLineEdit()
         form.addRow(self.t("Texto", "Text"), self.text)
@@ -465,10 +505,28 @@ class Editor(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(fields)
+        side_layout.addWidget(
+            self.panel_title(self.t("Propiedades del fragmento", "Caption properties"))
+        )
         side_layout.addWidget(scroll, 2)
         split.addWidget(side)
         split.setSizes([720, 475])
         self.statusBar().showMessage(self.t("Creado por sudo_pita", "Created by sudo_pita"))
+
+    @staticmethod
+    def panel_title(text):
+        label = QLabel(text)
+        label.setObjectName("panelTitle")
+        return label
+
+    @staticmethod
+    def inset(widget, name):
+        frame = QFrame()
+        frame.setObjectName(name)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(3, 3, 3, 3)
+        layout.addWidget(widget)
+        return frame
 
     def _fields(self, *widgets):
         row = QHBoxLayout()
@@ -830,7 +888,7 @@ class Editor(QMainWindow):
         device = self.device.currentData()
         prompt = self.prompt
         self.start_job(
-            lambda progress, cancelled: transcribe_project(
+            lambda progress, cancelled: run_transcription(
                 path,
                 model,
                 language=language,
@@ -842,12 +900,16 @@ class Editor(QMainWindow):
             ),
             lambda project: self.commit(project, 0),
         )
+        self.progress.setRange(0, 0)
+        self.statusBar().showMessage(
+            self.t("Preparando la transcripción…", "Preparing transcription…")
+        )
 
     def start_job(self, operation, callback, *, waveform=False, can_cancel=True):
         self.job = Job(operation, self)
         self.job_callback = callback
         self.job_waveform = waveform
-        self.job.progress.connect(self.progress.setValue)
+        self.job.progress.connect(self.update_progress)
         self.job.finished.connect(self.finish_job)
         self.transcribe_button.setEnabled(False)
         self.cancel_button.setEnabled(not waveform and can_cancel)
@@ -855,6 +917,15 @@ class Editor(QMainWindow):
         self.progress.setValue(0)
         self.progress.setVisible(not waveform)
         self.job.start()
+
+    def update_progress(self, percent):
+        if percent < 0:
+            self.progress.setRange(0, 0)
+        else:
+            if self.progress.maximum() == 0:
+                self.statusBar().showMessage(self.t("Transcribiendo…", "Transcribing…"))
+            self.progress.setRange(0, 100)
+            self.progress.setValue(percent)
 
     def finish_job(self):
         job = self.job
@@ -871,6 +942,11 @@ class Editor(QMainWindow):
                 self.show_error(job.error)
         else:
             self.job_callback(job.result)
+            if self.statusBar().currentMessage() in (
+                self.t("Preparando la transcripción…", "Preparing transcription…"),
+                self.t("Transcribiendo…", "Transcribing…"),
+            ):
+                self.statusBar().showMessage(self.t("Transcripción lista.", "Transcription ready."))
         job.deleteLater()
 
     def cancel_job(self):
@@ -940,6 +1016,12 @@ class Editor(QMainWindow):
         self.list.blockSignals(False)
         self.select_cue(self.list.currentRow(), seek=False)
         label = f" · {Path(self.project.source).name}" if self.project else ""
+        self.media_name.setText(
+            Path(self.project.source).name if self.project else self.t("Sin video", "No video")
+        )
+        self.preview.empty_text = (
+            "" if self.project else self.t("Abre un video para comenzar", "Open a video to begin")
+        )
         self.setWindowTitle(
             "Pitranscriptor" + label + (" *" if self.project != self.saved_project else "")
         )
@@ -1312,26 +1394,24 @@ class Editor(QMainWindow):
 
 
 def configure_application(app):
-    app.setStyle("Fusion")
+    app.setStyle("Windows")
     if os.name == "nt" and app.platformName() == "offscreen":
         fonts = Path(os.environ["SystemRoot"]) / "Fonts"
         for filename in ("segoeui.ttf", "segoeuib.ttf"):
             QFontDatabase.addApplicationFont(str(fonts / filename))
         app.setFont(QFont("Segoe UI", 9))
-    app.setStyleSheet("""
-        QMainWindow, QDialog { background: #d7e0e6; }
-        QMenuBar { background: #d7e0e6; }
-        QPushButton { padding: 5px 9px; }
-        QToolTip { background: #fff3ce; color: #172635; }
-    """)
+    app.setStyleSheet(STYLESHEET)
 
 
 def main(argv=None):
+    arguments = sys.argv[1:] if argv is None else argv
+    if len(arguments) == 2 and arguments[0] == WORKER_FLAG:
+        return worker(Path(arguments[1]))
     parser = argparse.ArgumentParser(prog="pitranscriptor-desktop")
     parser.add_argument("project", type=Path, nargs="?")
     parser.add_argument("--language", choices=("es", "en"))
     parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     if args.self_test:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication([sys.argv[0]])

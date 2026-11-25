@@ -84,6 +84,8 @@ Para videos que cambian entre español e inglés, **Español + English** detecta
 
 **Editar → Revisar palabras dudosas** muestra las palabras con una puntuación de confianza del modelo por debajo de 0,5 y permite saltar a su posición. La puntuación orienta la revisión. Al corregir una palabra, se retira su puntuación original.
 
+En Windows, el proceso de transcripción también busca cuBLAS 12 y cuDNN 9 en `%LOCALAPPDATA%\sudo_pita\Pitranscriptor\cuda`. Se puede elegir otra carpeta para ese proceso con `PITRANSCRIPTOR_CUDA_DIR`. El editor muestra qué biblioteca falta cuando CUDA no puede iniciarse. Cada intento se ejecuta en un proceso independiente. **Cancelar** termina incluso un intento bloqueado dentro del motor, y el editor también lo termina si pasan tres minutos sin señales de avance. Durante la preparación la barra indica actividad hasta recibir un porcentaje.
+
 **Archivo → Exportar video** aplica en MP4 o MOV la misma composición de la vista previa. La exportación H.264 permite ajustar calidad, altura máxima y cuadros por segundo. Conservar el valor original mantiene los tiempos de los cuadros cuando el archivo proporciona marcas temporales. La resolución queda limitada a la del original y se redondea a dimensiones pares para H.264. La primera pista AAC se copia. Para otras pistas se usa AAC con un máximo de dos canales y la aplicación indica la conversión al terminar. Se comprobó rotación de metadatos, orientación vertical, recodificación de PCM, copia AAC y cancelación con clips de prueba. Para fuentes HDR, códecs alternativos y archivos con varias pistas, quedan pendientes pruebas de conservación de características.
 
 ## Construir un instalador de prueba
