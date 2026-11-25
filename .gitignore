@@ -1,0 +1,27 @@
+# Local inputs, outputs and models
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.mp3
+*.srt
+*.vtt
+*.pitranscriptor
+models/
+outputs/
+
+# Python and build artifacts
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+.pytest_cache/
+
+# Local secrets and system files
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
