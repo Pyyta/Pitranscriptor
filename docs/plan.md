@@ -18,12 +18,11 @@
 - [x] Matriz inicial de Windows y Linux y comprobaciones CI.
 - [x] Construcción repetible y prueba del wheel en entorno limpio.
 - [x] Guiones de evaluación, manifiesto local y validación de audios y referencias.
-- [x] Incorporar una primera grabación propia con permiso y referencia confirmada por el usuario.
-- [ ] Ampliar referencias revisadas para cubrir las distintas condiciones de audio e idiomas.
+- [x] Incorporar un conjunto inicial de cuatro grabaciones propias con permiso y referencias corregidas/confirmadas por el usuario.
 
-La preparación técnica y la primera muestra revisada están disponibles. Hay tres copias técnicas adicionales pendientes de referencia y primeros borradores experimentales en CPU. La evaluación representativa y la comparación de modelos siguen abiertas. Evidencia y decisiones en la [memoria](memoria-proyecto.md); procedimiento en [pruebas de reconocimiento](pruebas-reconocimiento.md).
+La fase 1 dispone de la preparación técnica y un conjunto inicial validado de cuatro referencias revisadas. La ampliación de condiciones e idiomas y la comparación de modelos corresponden a fase 2. Evidencia y decisiones en la [memoria](memoria-proyecto.md); procedimiento en [pruebas de reconocimiento](pruebas-reconocimiento.md).
 
-La fase 2 tiene un primer ensayo medido en una referencia confirmada, con el mismo modelo small en CPU y con/sin pistas. No se considera terminada: faltan más referencias, modelos comparables, otras condiciones de audio y validación de GPU cuando sea viable.
+La fase 2 tiene un ensayo con/sin pistas sobre la muestra inicial y una línea base sin pistas sobre cuatro referencias revisadas, con el mismo modelo small en CPU. No se considera terminada: faltan modelos comparables, referencias más independientes del motor evaluado, otras condiciones de audio e idiomas y validación de GPU cuando sea viable.
 
 ## Pruebas de aceptación
 

@@ -17,7 +17,7 @@ En el equipo de desarrollo ya se crearon estas rutas dentro del repositorio:
 
 El manifiesto local está en `data/local/corpus/manifest.json`; se conserva sin sobrescribirlo. Estas carpetas están ignoradas por Git y no se incluyen en el repositorio remoto. Git no recrea carpetas locales vacías al clonar; en otro equipo deben prepararse de nuevo.
 
-La primera grabación ya está preparada y su referencia fue confirmada por el usuario. El subconjunto local `data/local/corpus/reviewed.json` contiene solo esa muestra; `manifest.json` conserva también los casos aún pendientes. Las otras tres copias técnicas seleccionadas siguen pendientes de referencias revisadas. No hace falta grabar más antes de aprovechar estas muestras.
+Las cuatro grabaciones están preparadas y sus referencias fueron revisadas por el usuario, con cuatro correcciones en dos muestras adicionales y confirmación de que no hay más cambios. El subconjunto local `data/local/corpus/reviewed.json` contiene las cuatro muestras; `manifest.json` conserva también los casos aún pendientes. Los borradores originales del motor se conservan sin aplicarles las correcciones de referencia. No hace falta grabar más antes de aprovechar este conjunto inicial.
 
 ## Preparar una copia sin modificar el original
 
@@ -60,7 +60,7 @@ El validador acepta conjuntos parciales para poder preparar una muestra a la vez
 
 Comparar modelos multilingües en CPU, y NVIDIA solo si se puede verificar, con y sin pistas del vocabulario. Registrar modelo y revisión exactos, cuantización, equipo, configuración, tiempo, memoria y errores de términos junto con WER y CER. Conservar resultados sin normalizar y una política de normalización documentada; evaluar silencio por palabras inventadas (WER no está definida con referencia vacía). No eliminar muletillas antes de medir reconocimiento.
 
-Los resultados privados y cualquier detalle de voces quedan en `reports/local/`. Publicar solo resúmenes revisados que no expongan audio, transcripciones personales o datos identificables. Hay una referencia real revisada; aún faltan otras voces, inglés completo, silencio y más referencias para una evaluación representativa.
+Los resultados privados y cualquier detalle de voces quedan en `reports/local/`. Publicar solo resúmenes revisados que no expongan audio, transcripciones personales o datos identificables. Hay cuatro referencias reales revisadas; aún faltan otras voces, inglés completo, silencio y más referencias para una evaluación representativa.
 
 ## Primer ensayo con referencia confirmada
 
@@ -79,4 +79,18 @@ El módulo `pitranscriptor.evaluation` implementa Levenshtein, WER y CER: sustit
 
 Las tasas pueden superar el 100 % por inserciones. Con referencia vacía, la tasa es `null` y se informa el número de errores sin inventar un porcentaje. Los términos se cotejan por palabras/frases completas, sin contar subcadenas, y deben existir en la referencia revisada. Esto mide presencia exacta, no todas las ocurrencias ni variantes fonéticas.
 
-Los borradores, textos, marcas por palabra, hashes y mediciones detalladas permanecen en `reports/local/`; las otras tres muestras técnicas siguen pendientes de revisión humana antes de puntuarlas.
+Los borradores, textos, marcas por palabra, hashes y mediciones detalladas permanecen en `reports/local/`.
+
+## Línea base ampliada tras revisión del usuario
+
+Con las correcciones y la confirmación de revisión de las tres muestras adicionales, el conjunto validado contiene cuatro audios, 322,716 segundos y 951 palabras de referencia. Se puntúan los borradores originales sin pistas del mismo modelo small en CPU, conservando la política anterior:
+
+| Muestra | Errores de palabras | Palabras de referencia | WER |
+| --- | --- | --- | --- |
+| Guion inicial | 10 | 39 | 25,64 % |
+| Técnica A | 0 | 274 | 0 % |
+| Técnica B | 3 | 285 | 1,05 % |
+| Técnica C | 7 | 353 | 1,98 % |
+| Conjunto ponderado por palabras | 20 | 951 | 2,10 % |
+
+El conjunto se calcula sumando errores y palabras de referencia, no promediando porcentajes por archivo. Las tres referencias adicionales se originaron en borradores de este mismo motor y fueron revisadas/corregidas por el usuario; ese origen debe conservarse al interpretar los resultados. No equivalen a una transcripción independiente hecha desde cero. Esta línea base no valida otros modelos, voces, idiomas ni equipos y no convierte los errores corregidos en reglas automáticas del reconocedor.
