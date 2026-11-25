@@ -95,7 +95,9 @@ uv sync --locked --all-extras --group package
 uv run --frozen --all-extras --group package python scripts/build_desktop.py
 ```
 
-En Windows, `dist/desktop/Pitranscriptor-Setup.exe` instala en una carpeta nueva del usuario y añade un acceso al menú Inicio al usar la interfaz. La compilación de prueba carece de firma digital. En Linux, extraer `dist/desktop/Pitranscriptor-linux-x86_64.tar.gz` y ejecutar `sh install-linux.sh` desde el directorio extraído. Para una instalación de prueba en otra carpeta, pasarla como argumento. Las compilaciones de CI se realizan en Windows y Ubuntu 22.04. Los binarios quedan en el entorno de compilación y los modelos se descargan desde la aplicación.
+En Windows, `dist/desktop/Pitranscriptor-Setup.exe` instala en una carpeta nueva del usuario y añade un acceso al menú Inicio al usar la interfaz. La compilación de prueba carece de firma digital. En Linux, extraer `dist/desktop/Pitranscriptor-linux-x86_64.tar.gz` y ejecutar `sh install-linux.sh` desde el directorio extraído. Para una instalación de prueba en otra carpeta, pasarla como argumento. Los binarios quedan en el entorno de compilación y los modelos se descargan desde la aplicación.
+
+Se comprobó instalación y arranque en Windows y Ubuntu 22.04. La prueba Linux incluye X11 con Xvfb y Wayland con Weston en entornos virtuales de CI. Queda pendiente una prueba real en Windows 10. [Ejecución de paquetes](https://github.com/Pyyta/Pitranscriptor/actions/runs/45705070175).
 
 ## Matriz inicial, objetivos y evidencia
 
