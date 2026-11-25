@@ -4,8 +4,30 @@ import hashlib
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
+
+
+def check_archive(path: Path) -> None:
+    if path.suffix == ".whl":
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+    else:
+        with tarfile.open(path) as archive:
+            names = archive.getnames()
+    forbidden = {".cache", ".tools", ".venv", "models", "local"}
+    media = {".wav", ".mp3", ".mp4", ".mov", ".mkv", ".webm", ".flac", ".m4a", ".ogg"}
+    if any(
+        forbidden.intersection(Path(name).parts) or Path(name).suffix.lower() in media
+        for name in names
+    ):
+        raise SystemExit("El paquete contiene medios o directorios reservados a datos locales")
+    if not all(
+        any(name.endswith(f"/{notice}") for name in names) for notice in ("LICENSE", "NOTICE")
+    ):
+        raise SystemExit("Faltan LICENSE o NOTICE en el paquete")
 
 
 def main() -> None:
@@ -32,6 +54,8 @@ def main() -> None:
             }
             if len(hashes) != 2:
                 raise SystemExit("Se esperaba un wheel y un sdist")
+            for name in hashes:
+                check_archive(output / name)
             results.append(hashes)
         if results[0] != results[1]:
             raise SystemExit("Las dos compilaciones no son idénticas")

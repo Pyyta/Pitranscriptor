@@ -11,9 +11,18 @@
 7. **Hablantes y robustez:** evaluación de diarización, corrección manual, modo sin conexión, errores, cancelación y accesibilidad.
 8. **Distribución:** instalador Windows y distribución Linux, dependencias y modelos, revisión de licencias, CI y pruebas de instalación limpia en los sistemas objetivo. Documentar lo realmente compatible.
 
-## Pruebas de aceptación
+## Estado de la fase 1
 
-Estado de fase 1: base Python y licencia implementadas; matriz de sistemas y CI preparados; validación de dependencias y compilación ejecutadas localmente en Windows 11. La preparación de grabaciones propias continúa; no hay aún mediciones de reconocimiento. Evidencia y decisiones en la [memoria](memoria-proyecto.md).
+- [x] Licencia GPL-3.0-only elegida por el usuario.
+- [x] Estructura Python instalable, versiones y dependencias bloqueadas.
+- [x] Matriz inicial de Windows y Linux y comprobaciones CI.
+- [x] Construcción repetible y prueba del wheel en entorno limpio.
+- [x] Guiones de evaluación, manifiesto local y validación de audios y referencias.
+- [ ] Incorporar grabaciones propias autorizadas y revisar sus transcripciones con escucha real.
+
+La preparación técnica está implementada; el conjunto de audio real sigue pendiente y no hay mediciones de reconocimiento. No se cierra esa parte de la fase por disponer solo de guiones. Evidencia y decisiones en la [memoria](memoria-proyecto.md); pasos para grabar en [pruebas de reconocimiento](pruebas-reconocimiento.md).
+
+## Pruebas de aceptación
 
 - Transcribir muestras español/inglés con las palabras del vocabulario, comparándolas contra texto revisado; registrar resultados sin prometer reconocimiento perfecto.
 - Probar audios con silencio, música moderada, muletillas y dos hablantes; verificar que el usuario pueda corregir el resultado y los colores.

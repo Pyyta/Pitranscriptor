@@ -30,7 +30,7 @@ dev = ["hatchling==1.33.0", "pytest==9.2.0", "ruff==0.17.6"]
 packages = ["src/pitranscriptor"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/scripts", "/docs", "/.python-version", "/uv.lock"]
+include = ["/src", "/tests", "/scripts", "/docs", "/data/templates", "/.python-version", "/uv.lock"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -56,7 +56,9 @@ uv run --frozen python scripts/verify_build.py
 uv build --no-build-isolation
 ```
 
-El primer comando construye dos veces con `SOURCE_DATE_EPOCH` fijo y compara SHA256 de wheel y sdist. Usa Hatchling y sus dependencias del entorno bloqueado, sin resolver herramientas nuevas. El segundo deja los paquetes en `dist/` (ignorado). Son paquetes Python de desarrollo, no instaladores. No publica en PyPI ni GitHub Releases. La igualdad se comprueba dentro del mismo entorno; no implica igualdad entre plataformas o futuros instaladores.
+El primer comando construye dos veces con `SOURCE_DATE_EPOCH` fijo y compara SHA256 de wheel y sdist. Comprueba también avisos de licencia y ausencia de medios y directorios privados en ambos paquetes. Usa Hatchling y sus dependencias del entorno bloqueado, sin resolver herramientas nuevas. El segundo deja los paquetes en `dist/` (ignorado). Son paquetes Python de desarrollo, no instaladores. No publica en PyPI ni GitHub Releases. La igualdad se comprueba dentro del mismo entorno; no implica igualdad entre plataformas o futuros instaladores.
+
+Para preparar audios propios, seguir [las instrucciones del corpus](pruebas-reconocimiento.md) y usar `pitranscriptor validate-corpus`. El validador funciona sin los extras; los datos reales se guardan en `data/local/`.
 
 ## Matriz inicial, objetivos y evidencia
 

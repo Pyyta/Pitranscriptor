@@ -2,8 +2,11 @@
 
 import argparse
 import json
+import sys
+from pathlib import Path
 
 from pitranscriptor import __version__
+from pitranscriptor.corpus import validate_corpus
 from pitranscriptor.diagnostics import environment_report
 
 
@@ -16,7 +19,25 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command")
     doctor = commands.add_parser("doctor", help="Inspeccionar dependencias locales sin usar la red")
     doctor.add_argument("--json", action="store_true", help="Imprimir el diagnóstico como JSON")
+    corpus = commands.add_parser(
+        "validate-corpus", help="Validar grabaciones propias y referencias"
+    )
+    corpus.add_argument("manifest", type=Path, help="Ruta del manifiesto local JSON")
     args = parser.parse_args(argv)
+    if args.command == "validate-corpus":
+        report = validate_corpus(args.manifest)
+        if not report.ok:
+            for issue in report.issues:
+                print(issue, file=sys.stderr)
+            print("Corpus pendiente de corrección; no se ejecutó reconocimiento.", file=sys.stderr)
+            return 1
+        print(
+            f"Corpus válido: {report.sample_count} muestras, "
+            f"{report.duration_seconds:.2f} segundos."
+        )
+        print(f"Etiquetas: {', '.join(report.tags)}")
+        print("Validación de archivos y declaraciones; la precisión todavía no se ha evaluado.")
+        return 0
     if args.command == "doctor":
         report = environment_report()
         if args.json:

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "id": "linux",
+      "audio": "audio/linux.wav",
+      "tags": ["mixed", "tech", "clean"],
+      "reference_text": "Hoy probamos el Kernel de Ubuntu, Arch Linux y Omarchy. También comparo i3wm, Void Linux, Gentoo y openSUSE. En Wayland y Xorg reviso zram, systemd, initramfs, chroot y mis dotfiles. Mi Tiling window manager abre una terminal sin problemas.",
+      "terms": ["Kernel", "Omarchy", "Ubuntu", "Arch Linux", "i3wm", "Void Linux", "Gentoo", "openSUSE", "Wayland", "Xorg", "zram", "systemd", "initramfs", "chroot", "dotfiles", "Tiling window manager"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "ia",
+      "audio": "audio/ia.wav",
+      "tags": ["mixed", "tech", "clean"],
+      "reference_text": "Con Claude Code, Gemini y OpenAI comparo un LLM y un sistema RAG. Las Embeddings, la Tokenization y el Fine-tuning pueden cambiar el resultado. Hay que revisar la Hallucination. Uso MCP y Ollama, y pruebo CUDA, TensorRT y Quantization con la VRAM disponible y una NPU.",
+      "terms": ["Claude Code", "Gemini", "OpenAI", "LLM", "RAG", "Embeddings", "Tokenization", "Fine-tuning", "Hallucination", "MCP", "Ollama", "CUDA", "TensorRT", "Quantization", "VRAM", "NPU"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "graficos",
+      "audio": "audio/graficos.wav",
+      "tags": ["mixed", "tech", "clean"],
+      "reference_text": "Este ejemplo combina Ray tracing, Ambient Occlusion y una superficie NURBS. El Shader y la Rasterization afectan la imagen. Medimos el Bottleneck sin confundirlo con el TDP o con el ancho de banda de PCIe.",
+      "terms": ["Ray tracing", "Ambient Occlusion", "NURBS", "Shader", "Rasterization", "Bottleneck", "TDP", "PCIe"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "datos",
+      "audio": "audio/datos.wav",
+      "tags": ["mixed", "tech", "clean"],
+      "reference_text": "Con PostgreSQL, PostGIS y pgAdmin reviso los datos. SQLite resuelve otro caso pequeño. Docker y Kubernetes ejecutan el servicio. En n8n conecto un Webhook y verifico Idempotency, Concurrency y Mutex para investigar un Segfault.",
+      "terms": ["PostgreSQL", "PostGIS", "pgAdmin", "SQLite", "Docker", "Kubernetes", "n8n", "Webhook", "Idempotency", "Concurrency", "Mutex", "Segfault"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "redes",
+      "audio": "audio/redes.wav",
+      "tags": ["mixed", "tech", "clean"],
+      "reference_text": "Subimos el servicio a Cloud y entramos mediante SSH. Revisamos TCP/IP, un Reverse proxy y el enfoque Zero trust. Con Sandboxing aislamos la prueba. Ahora cambio al inglés: please check the connection and restart the service.",
+      "terms": ["Cloud", "SSH", "TCP/IP", "Reverse proxy", "Zero trust", "Sandboxing"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "ingles",
+      "audio": "audio/ingles.wav",
+      "tags": ["english", "clean"],
+      "reference_text": "Please open the video and check every subtitle. We need accurate words and readable captions. Keep the original resolution and listen carefully before changing the timing.",
+      "terms": [],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "muletillas",
+      "audio": "audio/muletillas.wav",
+      "tags": ["mixed", "fillers"],
+      "reference_text": "Eee, hoy voy a abrir Docker. Mmm, la palabra kernel sí pertenece a la frase. Eh, please wait, todavía no termina. Bueno, ahora revisamos el resultado.",
+      "terms": ["Docker", "kernel"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "dos-voces",
+      "audio": "audio/dos-voces.wav",
+      "tags": ["mixed", "two-speakers"],
+      "reference_text": "¿Ya abriste Ubuntu? Sí, ahora pruebo el Shader. Please check the video. De acuerdo, revisemos los subtítulos.",
+      "terms": ["Ubuntu", "Shader"],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    },
+    {
+      "id": "silencio",
+      "audio": "audio/silencio.wav",
+      "tags": ["silence"],
+      "reference_text": "",
+      "terms": [],
+      "permission_for_local_evaluation": false,
+      "reference_reviewed": false
+    }
+  ]
+}

@@ -15,6 +15,7 @@ Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte par
 - [Vocabulario tecnológico inicial](docs/vocabulario.md)
 - [Entorno, comandos y matriz de validación](docs/desarrollo.md)
 - [Licencia y revisión de componentes](docs/licencias.md)
+- [Preparar grabaciones propias de evaluación](docs/pruebas-reconocimiento.md)
 
 ## Desarrollo
 
