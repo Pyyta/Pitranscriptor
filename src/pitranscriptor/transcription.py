@@ -130,7 +130,7 @@ def transcribe_project(
                     for index, token in enumerate(tokens):
                         first = start + (end - start) * index // len(tokens)
                         last = start + (end - start) * (index + 1) // len(tokens)
-                        words.append(Word(token, first, last))
+                        words.append(Word(token, first, last, word.probability))
                     last_end = end
                 progress(min(99, last_end * 100 // duration))
     except av.FFmpegError as error:

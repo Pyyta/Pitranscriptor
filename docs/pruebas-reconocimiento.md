@@ -117,3 +117,5 @@ Revisiones probadas de [Medium](https://huggingface.co/Systran/faster-whisper-me
 ## Prueba del modo mixto
 
 En un clip sintético creado localmente con dos voces de Windows, el modo español omitió el pasaje en inglés y acumuló 20 errores sobre 33 palabras. El modo mixto dividió el audio por pausas, detectó el idioma en cada tramo y conservó ambos pasajes, con 2 errores sobre 33 palabras. El clip de inglés completo tuvo un error sobre 19 palabras en modo inglés. El modo mixto produjo cero fragmentos en una prueba de silencio. Esta prueba comprueba el cambio entre tramos separados por pausas. Queda por medir el cambio de idioma dentro de una misma frase con habla natural.
+
+En la muestra natural inicial de 39 palabras, el modo mixto sin pistas produjo 14 errores y recuperó 6 de 16 términos. El modo español sin pistas dio 10 errores y 8 términos en esa muestra. El editor mantiene español como modo inicial y ofrece mixto para grabaciones que cambian de idioma entre tramos.

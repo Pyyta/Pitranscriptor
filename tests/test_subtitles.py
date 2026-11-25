@@ -21,9 +21,10 @@ def test_fragmentation_preserves_words_and_honors_pauses_and_seven_word_limit():
 
 
 def test_word_timing_for_text_changes():
-    cue = Cue(20, 400, "Hola mundo", (Word("Hola", 20, 180), Word("mundo", 200, 400)))
+    cue = Cue(20, 400, "Hola mundo", (Word("Hola", 20, 180, 0.7), Word("mundo", 200, 400, 0.2)))
     edited = edit_cue(cue, "Hola Linux", 20, 400)
     assert edited.words[1] == Word("Linux", 200, 400)
+    assert edited.words[0].probability == 0.7
     assert not edit_cue(cue, "Hola nuevo mundo", 20, 400).words
     assert not edit_cue(cue, "Hola mundo", 50, 300).words
 

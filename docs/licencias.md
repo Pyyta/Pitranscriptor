@@ -25,6 +25,8 @@ Esta es una revisión inicial, no una autorización completa de futuros instalad
 
 Los instaladores de prueba se construyen en local y CI. El flujo de compilación copia los avisos proporcionados por los paquetes y registra sus versiones. Antes de publicar binarios, falta comprobar que las compilaciones concretas de FFmpeg, H.264 y Qt instaladas con las ruedas admitan redistribución en los términos elegidos y preparar sus fuentes y avisos correspondientes. La compilación excluye las grabaciones, los pesos y las bibliotecas CUDA del entorno de prueba.
 
+En la rueda de PyAV 18.1.1 para Windows se comprobó que `avcodec_configuration` lista `--enable-libx264` y `--enable-libx265`. `avcodec_license` informa LGPL versión 3 o posterior para la biblioteca FFmpeg. El mantenedor distingue la licencia BSD del código Python de las condiciones de los binarios, que requieren revisar también los códecs incluidos y el material de construcción correspondiente. Qt Multimedia tiene su propia compilación de FFmpeg y avisos. Véanse la [discusión de PyAV](https://github.com/PyAV-Org/PyAV/issues/2270), sus [scripts de construcción](https://github.com/PyAV-Org/pyav-ffmpeg) y los [avisos de Qt Multimedia](https://doc.qt.io/qt-6.12/qtmultimedia-attribution-ffmpeg.html).
+
 ## Grabaciones de pruebas
 
 El usuario eligió grabaciones propias. Audios y transcripciones revisadas permanecerán en `data/local/`, ignorado por Git. Registrar permiso de cada muestra y de todas las voces; un audio propio puede contener música o voces ajenas con otros derechos. El permiso para pruebas locales no autoriza publicarlo ni enviarlo a proveedores. Los guiones públicos son texto original del proyecto bajo GPL-3.0-only.

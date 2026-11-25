@@ -36,7 +36,8 @@ def edit_cue(cue: Cue, text: str, start_ms: int, end_ms: int) -> Cue:
         start_ms <= word.start_ms and word.end_ms <= end_ms for word in cue.words
     ):
         words = tuple(
-            replace(word, text=token) for word, token in zip(cue.words, tokens, strict=True)
+            word if token == word.text else replace(word, text=token, probability=None)
+            for word, token in zip(cue.words, tokens, strict=True)
         )
     return replace(cue, text=" ".join(tokens), start_ms=start_ms, end_ms=end_ms, words=words)
 

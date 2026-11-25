@@ -24,11 +24,16 @@ class Word:
     text: str
     start_ms: int
     end_ms: int
+    probability: float | None = None
 
     def __post_init__(self):
         check_times(self.start_ms, self.end_ms)
         if len(self.text.split()) != 1 or self.text != self.text.strip():
             raise ValueError("Cada palabra temporizada debe contener un solo elemento")
+        if self.probability is not None and (
+            type(self.probability) not in (int, float) or not 0 <= self.probability <= 1
+        ):
+            raise ValueError("La confianza de reconocimiento debe estar entre 0 y 1")
 
 
 @dataclass(frozen=True)

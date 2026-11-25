@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
 from pitranscriptor.models import download_small, model_ready
 from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
-from pitranscriptor.subtitles import Cue, Style, Word, render_subtitles
+from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import inspect_media, transcribe_project
 from pitranscriptor.video_export import export_video
 from pitranscriptor.waveform import audio_peaks
@@ -274,6 +274,11 @@ class Editor(QMainWindow):
         )
         self._action(edit, self.t("Aplicar preset…", "Apply preset…"), self.apply_preset)
         self._action(edit, self.t("Revisar muletillas…", "Review fillers…"), self.review_fillers)
+        self._action(
+            edit,
+            self.t("Revisar palabras dudosas…", "Review uncertain words…"),
+            self.review_uncertain,
+        )
         self._action(edit, self.t("Colorear por hablante", "Color by speaker"), self.color_speakers)
         help_menu = self.menuBar().addMenu(self.t("Ayuda", "Help"))
         self._action(help_menu, self.t("Acerca de", "About"), self.about)
@@ -302,7 +307,7 @@ class Editor(QMainWindow):
         toolbar.addWidget(self._button(self.t("Abrir video", "Open video"), self.open_video))
         toolbar.addWidget(self._button(self.t("Modelo…", "Model…"), self.choose_model))
         self.language_mode = self._combo(
-            [("Español + English", "mixed"), ("Español", "es"), ("English", "en"), ("Auto", None)]
+            [("Español", "es"), ("Español + English", "mixed"), ("English", "en"), ("Auto", None)]
         )
         toolbar.addWidget(self.language_mode)
         self.device = self._combo([("CPU", "cpu"), ("NVIDIA CUDA", "cuda")])
@@ -1067,7 +1072,7 @@ class Editor(QMainWindow):
             try:
                 start, end = (int(part.strip()) for part in value.split(","))
                 words = list(cue.words)
-                words[index] = Word(word.text, start, end)
+                words[index] = replace(word, start_ms=start, end_ms=end)
                 self.splice(self.list.currentRow(), 1, [replace(cue, words=tuple(words))])
             except ValueError as error:
                 self.show_error(error)
@@ -1271,6 +1276,39 @@ class Editor(QMainWindow):
             for cue in self.project.cues
         )
         self.commit(self.project.with_cues(cues), self.list.currentRow())
+
+    def review_uncertain(self):
+        if self.project is None or self.job is not None:
+            return
+        options = {
+            f"{index + 1}.{word_index + 1} · {timestamp(word.start_ms)} · "
+            f"{word.text} · {word.probability:.0%}": (index, word.start_ms)
+            for index, cue in enumerate(self.project.cues)
+            for word_index, word in enumerate(cue.words)
+            if word.probability is not None and word.probability < 0.5
+        }
+        if not options:
+            self.statusBar().showMessage(
+                self.t("Sin palabras marcadas como dudosas.", "No words flagged as uncertain.")
+            )
+            return
+        selected, ok = QInputDialog.getItem(
+            self,
+            "Pitranscriptor",
+            self.t(
+                "Palabras con confianza del modelo inferior al 50 %",
+                "Words with model confidence below 50%",
+            ),
+            list(options),
+            0,
+            False,
+        )
+        if ok:
+            index, position = options[selected]
+            self.player.pause()
+            self.list.setCurrentRow(index)
+            self.player.setPosition(position)
+            self.text.setFocus()
 
 
 def configure_application(app):
