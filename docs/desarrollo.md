@@ -10,9 +10,11 @@ El núcleo de preparación usa solo la biblioteca estándar. Extras separados:
 | --- | --- | --- |
 | `dev` | pytest 9.2.0, Ruff 0.17.6, Hatchling 1.33.0 | Pruebas, revisión y construcción Python |
 | `desktop` | PySide6-Essentials 6.12.0 | Evaluar Qt Widgets sin instalar módulos no utilizados |
-| `research` | faster-whisper 1.2.1, CTranslate2 4.9.1 | Preparar la evaluación del motor local |
+| `research` | faster-whisper 1.2.1, CTranslate2 4.9.1, PyAV 18.1.1 | Preparar y decodificar audio para evaluar el motor local |
 
 `uv.lock` fija también versiones transitivas y hashes. No editarlo a mano. `uv lock` lo actualiza después de un cambio deliberado; `uv sync --locked` rechaza un archivo desactualizado. El extra `desktop` no contiene aún QtMultimedia; se revisará antes de implementar reproducción. No se ha seleccionado un modelo predeterminado.
+
+PyAV se fija por compatibilidad: faster-whisper 1.2.1 pasa `metadata_errors` a `av.open`, argumento retirado en PyAV 19. Se verificó el fallo y se eligió 18.1.1 con wheels para Windows/Linux. [Incidencia del motor](https://github.com/SYSTRAN/faster-whisper/issues/1589). Las pruebas opcionales ahora decodifican WAV con el motor además de importar bibliotecas; no requieren modelos.
 
 ## Preparar y ejecutar
 
@@ -59,6 +61,8 @@ uv build --no-build-isolation
 El primer comando construye dos veces con `SOURCE_DATE_EPOCH` fijo y compara SHA256 de wheel y sdist. Comprueba también avisos de licencia y ausencia de medios y directorios privados en ambos paquetes. Usa Hatchling y sus dependencias del entorno bloqueado, sin resolver herramientas nuevas. El segundo deja los paquetes en `dist/` (ignorado). Son paquetes Python de desarrollo, no instaladores. No publica en PyPI ni GitHub Releases. La igualdad se comprueba dentro del mismo entorno; no implica igualdad entre plataformas o futuros instaladores.
 
 Para preparar audios propios, seguir [las instrucciones del corpus](pruebas-reconocimiento.md) y usar `pitranscriptor validate-corpus`. El validador funciona sin los extras; los datos reales se guardan en `data/local/`.
+
+`pitranscriptor prepare-audio ORIGEN DESTINO.wav` utiliza el extra `research` para crear una copia PCM16 mono a 16 kHz. Rechaza sobrescribir, usar el original como salida, archivos sin una única pista o de más de cinco minutos. Elimina copias incompletas si falla y verifica que el hash del original no cambió.
 
 ## Matriz inicial, objetivos y evidencia
 

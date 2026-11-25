@@ -18,9 +18,10 @@
 - [x] Matriz inicial de Windows y Linux y comprobaciones CI.
 - [x] Construcción repetible y prueba del wheel en entorno limpio.
 - [x] Guiones de evaluación, manifiesto local y validación de audios y referencias.
-- [ ] Incorporar grabaciones propias autorizadas y revisar sus transcripciones con escucha real.
+- [x] Incorporar una primera grabación propia con permiso y referencia confirmada por el usuario.
+- [ ] Ampliar referencias revisadas para cubrir las distintas condiciones de audio e idiomas.
 
-La preparación técnica está implementada; el conjunto de audio real sigue pendiente y no hay mediciones de reconocimiento. No se cierra esa parte de la fase por disponer solo de guiones. Evidencia y decisiones en la [memoria](memoria-proyecto.md); pasos para grabar en [pruebas de reconocimiento](pruebas-reconocimiento.md).
+La preparación técnica y la primera muestra revisada están disponibles. Hay tres copias técnicas adicionales pendientes de referencia y primeros borradores experimentales en CPU. La evaluación representativa y la comparación de modelos siguen abiertas. Evidencia y decisiones en la [memoria](memoria-proyecto.md); procedimiento en [pruebas de reconocimiento](pruebas-reconocimiento.md).
 
 ## Pruebas de aceptación
 

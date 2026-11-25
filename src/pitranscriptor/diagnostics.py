@@ -9,7 +9,7 @@ from pitranscriptor import __version__
 
 def environment_report() -> dict:
     packages = {}
-    for name in ("PySide6-Essentials", "faster-whisper", "ctranslate2"):
+    for name in ("PySide6-Essentials", "faster-whisper", "ctranslate2", "av"):
         try:
             packages[name] = version(name)
         except PackageNotFoundError:

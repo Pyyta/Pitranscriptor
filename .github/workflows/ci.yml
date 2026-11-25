@@ -42,3 +42,4 @@ jobs:
           sudo apt-get install --no-install-recommends -y libegl1 libopengl0 libgl1 libxkbcommon0
       - run: uv sync --locked --all-extras
       - run: uv run --frozen --all-extras python scripts/check_runtime.py
+      - run: uv run --frozen --all-extras pytest

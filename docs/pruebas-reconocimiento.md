@@ -1,6 +1,6 @@
 # Preparación de grabaciones propias
 
-Esta fase prepara la evaluación; aún no ejecuta reconocimiento ni mide precisión. El usuario eligió grabaciones propias en lugar de un corpus público. No hay grabaciones reales incluidas. Los textos de [la plantilla](../data/templates/corpus.example.json) son **guiones originales**, no transcripciones verificadas de audios existentes.
+El usuario eligió grabaciones propias en lugar de un corpus público. Ya hay copias locales autorizadas y primeros borradores experimentales de reconocimiento, fuera del repositorio. La primera referencia fue confirmada palabra por palabra por el usuario. Los textos de [la plantilla](../data/templates/corpus.example.json) siguen siendo **guiones originales** y no se consideran revisados automáticamente al grabarlos.
 
 ## Carpetas locales preparadas
 
@@ -17,7 +17,17 @@ En el equipo de desarrollo ya se crearon estas rutas dentro del repositorio:
 
 El manifiesto local está en `data/local/corpus/manifest.json`; se conserva sin sobrescribirlo. Estas carpetas están ignoradas por Git y no se incluyen en el repositorio remoto. Git no recrea carpetas locales vacías al clonar; en otro equipo deben prepararse de nuevo.
 
-**Siguiente paso inmediato:** leer `data/local/corpus/guiones/linux.txt`, grabarlo con voz propia y guardar el archivo original en `data/local/originals/`, conservando la extensión real que genere la grabadora. Una vez disponible, preparar la copia `audio/linux.wav` y revisar lo que se dijo antes de confirmar permisos y referencia en el manifiesto. Se puede empezar por esta muestra sin grabar las nueve de una vez.
+La primera grabación ya está preparada y su referencia fue confirmada por el usuario. El subconjunto local `data/local/corpus/reviewed.json` contiene solo esa muestra; `manifest.json` conserva también los casos aún pendientes. Las otras tres copias técnicas seleccionadas siguen pendientes de referencias revisadas. No hace falta grabar más antes de aprovechar estas muestras.
+
+## Preparar una copia sin modificar el original
+
+Con el extra `research` instalado, sustituir los nombres del ejemplo por los archivos reales:
+
+```console
+uv run --frozen --extra research pitranscriptor prepare-audio data/local/originals/mi-grabacion.wav data/local/corpus/audio/mi-muestra.wav
+```
+
+La salida será WAV PCM de 16 bits, mono y 16000 Hz. El comando no sobrescribe, no recorta audios de más de cinco minutos y verifica el hash del original. PyAV usa sus bibliotecas FFmpeg; esta preparación no requiere un `ffmpeg` externo en PATH. No aplica eliminación de ruido, silencios ni muletillas.
 
 ## Preparar el conjunto local
 
@@ -50,4 +60,4 @@ El validador acepta conjuntos parciales para poder preparar una muestra a la vez
 
 Comparar modelos multilingües en CPU, y NVIDIA solo si se puede verificar, con y sin pistas del vocabulario. Registrar modelo y revisión exactos, cuantización, equipo, configuración, tiempo, memoria y errores de términos junto con WER y CER. Conservar resultados sin normalizar y una política de normalización documentada; evaluar silencio por palabras inventadas (WER no está definida con referencia vacía). No eliminar muletillas antes de medir reconocimiento.
 
-Los resultados privados y cualquier detalle de voces quedarán en `reports/local/`. Publicar solo resúmenes revisados que no expongan audio, transcripciones personales o datos identificables. Faltan las grabaciones y referencias reales para pasar de preparación a resultados.
+Los resultados privados y cualquier detalle de voces quedan en `reports/local/`. Publicar solo resúmenes revisados que no expongan audio, transcripciones personales o datos identificables. Hay una referencia real revisada; aún faltan otras voces, inglés completo, silencio y más referencias para una evaluación representativa.

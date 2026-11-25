@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from pitranscriptor import __version__
+from pitranscriptor.audio import prepare_audio
 from pitranscriptor.corpus import validate_corpus
 from pitranscriptor.diagnostics import environment_report
 
@@ -23,7 +24,20 @@ def main(argv: list[str] | None = None) -> int:
         "validate-corpus", help="Validar grabaciones propias y referencias"
     )
     corpus.add_argument("manifest", type=Path, help="Ruta del manifiesto local JSON")
+    prepare = commands.add_parser("prepare-audio", help="Crear una copia WAV para evaluación local")
+    prepare.add_argument("source", type=Path, help="Archivo original local")
+    prepare.add_argument("destination", type=Path, help="Copia WAV nueva, sin sobrescribir")
     args = parser.parse_args(argv)
+    if args.command == "prepare-audio":
+        try:
+            result = prepare_audio(args.source, args.destination)
+        except (OSError, ValueError) as error:
+            print(f"No se preparó el audio: {error}", file=sys.stderr)
+            return 1
+        print(f"Copia preparada: {result.duration_seconds:.3f} segundos, WAV PCM16 mono, 16000 Hz.")
+        print(f"SHA256 original: {result.source_sha256}")
+        print(f"SHA256 copia: {result.output_sha256}")
+        return 0
     if args.command == "validate-corpus":
         report = validate_corpus(args.manifest)
         if not report.ok:
