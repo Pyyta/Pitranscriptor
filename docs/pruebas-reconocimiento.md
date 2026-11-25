@@ -2,6 +2,23 @@
 
 Esta fase prepara la evaluación; aún no ejecuta reconocimiento ni mide precisión. El usuario eligió grabaciones propias en lugar de un corpus público. No hay grabaciones reales incluidas. Los textos de [la plantilla](../data/templates/corpus.example.json) son **guiones originales**, no transcripciones verificadas de audios existentes.
 
+## Carpetas locales preparadas
+
+En el equipo de desarrollo ya se crearon estas rutas dentro del repositorio:
+
+| Ruta | Uso |
+| --- | --- |
+| `data/local/originals/` | Grabaciones originales, conservando su formato |
+| `data/local/corpus/audio/` | Copias WAV preparadas para la evaluación |
+| `data/local/corpus/guiones/` | Copias de los nueve guiones en archivos `.txt` para leer al grabar |
+| `reports/local/` | Mediciones y resultados privados |
+| `models/` | Modelos locales cuando se seleccionen y descarguen |
+| `outputs/` | Exportaciones locales cuando se implemente esa función |
+
+El manifiesto local está en `data/local/corpus/manifest.json`; se conserva sin sobrescribirlo. Estas carpetas están ignoradas por Git y no se incluyen en el repositorio remoto. Git no recrea carpetas locales vacías al clonar; en otro equipo deben prepararse de nuevo.
+
+**Siguiente paso inmediato:** leer `data/local/corpus/guiones/linux.txt`, grabarlo con voz propia y guardar el archivo original en `data/local/originals/`, conservando la extensión real que genere la grabadora. Una vez disponible, preparar la copia `audio/linux.wav` y revisar lo que se dijo antes de confirmar permisos y referencia en el manifiesto. Se puede empezar por esta muestra sin grabar las nueve de una vez.
+
 ## Preparar el conjunto local
 
 1. Crear `data/local/corpus/` y copiar allí la plantilla como `manifest.json`. Copiar el archivo no concede permisos ni confirma revisión: sus dos declaraciones empiezan en `false`.
