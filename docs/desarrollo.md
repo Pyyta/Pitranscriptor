@@ -76,6 +76,8 @@ Los tiempos por palabra son estimaciones del modelo. Si la cantidad de palabras 
 
 Para abrir el editor, ejecutar `uv sync --locked --all-extras` y luego `uv run --frozen --all-extras pitranscriptor-desktop`. Elegir el video y seleccionar una carpeta de modelo instalado mediante **Modelo…**. Los fragmentos se pueden editar desde la lista, mover arrastrando en la vista previa pausada y guardar como proyecto. La línea de tiempo muestra forma de onda y admite búsqueda, zoom y velocidades de reproducción. Se puede cambiar el idioma desde el menú para el próximo inicio.
 
+Para seleccionar varios fragmentos, arrastra con el botón izquierdo sobre la pista de subtítulos. Se resaltan los fragmentos que cruzan el rango y sus filas en la lista. **Borrar** elimina la selección en una sola operación que se puede deshacer. Haz clic sobre un fragmento para volver a editarlo individualmente o sobre la forma de onda para limpiar la selección y situar el cursor.
+
 **Archivo → Descargar modelo Small** instala el modelo multilingüe en el directorio de datos de la aplicación. Con el modelo completo, la transcripción usa archivos locales. CPU es el modo inicial y **NVIDIA CUDA** se puede elegir cuando el proceso tiene acceso a las bibliotecas compatibles. La prueba local en Windows usó CUDA Runtime 12.9.79, cuBLAS 12.9.2.10 y cuDNN 9.28.1.4 en un directorio aislado con sus carpetas `bin` en `PATH`. Los demás equipos pueden usar CPU sin esos componentes.
 
 Para videos que cambian entre español e inglés, **Español + English** detecta el idioma por tramos de voz. Este modo exige un modelo multilingüe y usa pausas para separar los tramos. Los modos **Español**, **English** y **Auto** siguen disponibles. Por línea de comandos, `--language mixed` activa el mismo modo.

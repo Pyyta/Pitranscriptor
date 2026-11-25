@@ -12,10 +12,22 @@ from fractions import Fraction
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QPointF, QRectF, QSettings, QStandardPaths, Qt, QThread, QUrl, Signal
+from PySide6.QtCore import (
+    QItemSelection,
+    QItemSelectionModel,
+    QPointF,
+    QRectF,
+    QSettings,
+    QStandardPaths,
+    Qt,
+    QThread,
+    QUrl,
+    Signal,
+)
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPen
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
@@ -45,7 +57,17 @@ from PySide6.QtWidgets import (
 from pitranscriptor.models import download_small, model_ready
 from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
-from pitranscriptor.retro_theme import GRID, PLAYHEAD, STYLESHEET, TIMECODE, TRACE, WORKSPACE
+from pitranscriptor.retro_theme import (
+    CLIP,
+    GRID,
+    INK,
+    PLAYHEAD,
+    STYLESHEET,
+    TIMECODE,
+    TRACE,
+    WORKSPACE,
+    retro_palette,
+)
 from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
@@ -148,7 +170,10 @@ class Preview(QWidget):
 
 class Timeline(QWidget):
     seek = Signal(int)
-    selected = Signal(int)
+    selected = Signal(object, bool)
+    selection_started = Signal()
+    TRACK_TOP = 52
+    TRACK_HEIGHT = 23
 
     def __init__(self):
         super().__init__()
@@ -158,11 +183,28 @@ class Timeline(QWidget):
         self.zoom = 1
         self.cues = ()
         self.peaks = ()
-        self.selection = -1
+        self.selection = frozenset()
+        self.drag_start = None
+        self.drag_end = None
+        self.drag_viewport = None
 
     def viewport(self):
+        if self.drag_viewport is not None:
+            return self.drag_viewport
         span = self.duration / self.zoom
         return max(0, min(self.duration - span, self.position - span * 0.35)), span
+
+    def time_at(self, x):
+        start, span = self.viewport()
+        return start + max(0, min(1, x / max(1, self.width()))) * span
+
+    def rows_in_range(self, x1, x2):
+        start, end = sorted((self.time_at(x1), self.time_at(x2)))
+        if start == end:
+            return tuple(i for i, cue in enumerate(self.cues) if cue.start_ms <= start < cue.end_ms)
+        return tuple(
+            i for i, cue in enumerate(self.cues) if cue.start_ms < end and start < cue.end_ms
+        )
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -180,15 +222,25 @@ class Timeline(QWidget):
                 level = round(peak * 18)
                 painter.setPen(QColor(TRACE))
                 painter.drawLine(x, 28 - level, x, 28 + level)
+        band = None
+        selection = self.selection
+        if self.drag_end is not None:
+            left, right = sorted((self.drag_start, self.drag_end))
+            selection = frozenset(self.rows_in_range(left, right))
+            band = QRectF(left, self.TRACK_TOP - 2, right - left, self.TRACK_HEIGHT + 4)
+            painter.fillRect(band, QColor(49, 99, 120, 140))
         for index, cue in enumerate(self.cues):
             left = (cue.start_ms - start) * width / span
             right = (cue.end_ms - start) * width / span
             if right <= 0 or left >= width:
                 continue
-            box = QRectF(left, 52, max(1, right - left - 1), 23)
-            painter.fillRect(box, QColor(PLAYHEAD if index == self.selection else "#92acc2"))
+            box = QRectF(left, self.TRACK_TOP, max(1, right - left - 2), self.TRACK_HEIGHT)
+            painter.fillRect(box, QColor(PLAYHEAD if index in selection else CLIP))
+            if index in selection:
+                painter.setPen(QPen(QColor(INK), 1))
+                painter.drawRect(box.adjusted(1, 1, -1, -1))
             if box.width() > 44:
-                painter.setPen(QColor("#111820"))
+                painter.setPen(QColor(INK))
                 painter.drawText(
                     box.adjusted(4, 0, -3, 0),
                     Qt.AlignmentFlag.AlignVCenter,
@@ -196,6 +248,9 @@ class Timeline(QWidget):
                         cue.text, Qt.TextElideMode.ElideRight, int(box.width() - 7)
                     ),
                 )
+        if band is not None:
+            painter.setPen(QPen(QColor(TIMECODE), 1, Qt.PenStyle.DashLine))
+            painter.drawRect(band)
         painter.setPen(QColor(TIMECODE))
         painter.drawText(5, 90, timestamp(round(start)))
         last = timestamp(round(start + span))
@@ -205,14 +260,47 @@ class Timeline(QWidget):
         painter.drawLine(playhead, 0, playhead, 78)
 
     def mousePressEvent(self, event):
-        start, span = self.viewport()
-        ms = round(start + event.position().x() * span / max(1, self.width()))
-        if 52 <= event.position().y() <= 75:
-            for index, cue in enumerate(self.cues):
-                if cue.start_ms <= ms < cue.end_ms:
-                    self.selected.emit(index)
-                    return
-        self.seek.emit(ms)
+        if event.button() != Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(event)
+        point = event.position()
+        if self.TRACK_TOP <= point.y() < self.TRACK_TOP + self.TRACK_HEIGHT:
+            self.selection_started.emit()
+            self.drag_viewport = self.viewport()
+            self.drag_start = point.x()
+            self.drag_end = None
+        else:
+            self.seek.emit(round(self.time_at(point.x())))
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self.drag_start is None:
+            return super().mouseMoveEvent(event)
+        x = max(0, min(self.width(), event.position().x()))
+        if (
+            self.drag_end is not None
+            or abs(x - self.drag_start) >= QApplication.startDragDistance()
+        ):
+            self.drag_end = x
+            self.update()
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() != Qt.MouseButton.LeftButton or self.drag_start is None:
+            return super().mouseReleaseEvent(event)
+        x = max(0, min(self.width(), event.position().x()))
+        dragged = (
+            self.drag_end is not None
+            or abs(x - self.drag_start) >= QApplication.startDragDistance()
+        )
+        rows = self.rows_in_range(self.drag_start, x if dragged else self.drag_start)
+        position = round(self.time_at(self.drag_start))
+        self.drag_start = self.drag_end = self.drag_viewport = None
+        if dragged or rows:
+            self.selected.emit(rows, not dragged)
+        else:
+            self.seek.emit(position)
+        self.update()
+        event.accept()
 
 
 class Editor(QMainWindow):
@@ -240,7 +328,8 @@ class Editor(QMainWindow):
         )
         self.player.playbackStateChanged.connect(self.play_state_changed)
         self.timeline.seek.connect(self.seek_to)
-        self.timeline.selected.connect(lambda index: self.list.setCurrentRow(index))
+        self.timeline.selection_started.connect(self.player.pause)
+        self.timeline.selected.connect(self.set_caption_selection)
         self.preview.moved.connect(self.move_caption)
         self.setWindowTitle("Pitranscriptor")
         self.resize(1220, 790)
@@ -399,6 +488,15 @@ class Editor(QMainWindow):
         video_layout.addLayout(playback)
         video_layout.addWidget(self.panel_title(self.t("Línea de tiempo", "Timeline")))
         video_layout.addWidget(self.inset(self.timeline, "track"))
+        hint = self.t(
+            "Arrastra sobre la pista de subtítulos para seleccionar varios fragmentos.",
+            "Drag across the caption track to select several captions.",
+        )
+        timeline_hint = QLabel(hint)
+        timeline_hint.setObjectName("selectionHint")
+        timeline_hint.setWordWrap(True)
+        self.timeline.setAccessibleDescription(hint)
+        video_layout.addWidget(timeline_hint)
         split.addWidget(video)
 
         side = QWidget()
@@ -406,19 +504,25 @@ class Editor(QMainWindow):
         side_layout = QVBoxLayout(side)
         side_layout.setContentsMargins(7, 7, 7, 7)
         side_layout.setSpacing(5)
-        side_layout.addWidget(self.panel_title(self.t("Fragmentos", "Captions")))
+        self.caption_title = self.panel_title(self.t("Fragmentos", "Captions"))
+        side_layout.addWidget(self.caption_title)
         self.list = QListWidget()
-        self.list.currentRowChanged.connect(self.select_cue)
+        self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.list.itemSelectionChanged.connect(self.select_cue)
         side_layout.addWidget(self.list, 1)
         buttons = QHBoxLayout()
+        buttons.addWidget(self._button(self.t("Añadir", "Add"), self.add_cue))
+        self.single_caption_buttons = []
         for label, action in (
-            (self.t("Añadir", "Add"), self.add_cue),
             (self.t("Dividir", "Split"), self.split_cue),
             (self.t("Unir", "Join"), self.join_cue),
             (self.t("Duplicar", "Duplicate"), self.duplicate_cue),
-            (self.t("Borrar", "Delete"), self.remove_cue),
         ):
-            buttons.addWidget(self._button(label, action))
+            button = self._button(label, action)
+            self.single_caption_buttons.append(button)
+            buttons.addWidget(button)
+        self.delete_button = self._button(self.t("Borrar", "Delete"), self.remove_cue)
+        buttons.addWidget(self.delete_button)
         side_layout.addLayout(buttons)
         fields = QWidget()
         fields.setObjectName("inspector")
@@ -502,13 +606,13 @@ class Editor(QMainWindow):
                 self._button(self.t("Tiempos de palabras…", "Word times…"), self.edit_word),
             )
         )
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(fields)
+        self.inspector = QScrollArea()
+        self.inspector.setWidgetResizable(True)
+        self.inspector.setWidget(fields)
         side_layout.addWidget(
             self.panel_title(self.t("Propiedades del fragmento", "Caption properties"))
         )
-        side_layout.addWidget(scroll, 2)
+        side_layout.addWidget(self.inspector, 2)
         split.addWidget(side)
         split.setSizes([720, 475])
         self.statusBar().showMessage(self.t("Creado por sudo_pita", "Created by sudo_pita"))
@@ -972,7 +1076,7 @@ class Editor(QMainWindow):
         self.timeline.update()
 
     def seek_to(self, position):
-        self.list.setCurrentRow(-1)
+        self.set_caption_selection((), False)
         self.player.setPosition(position)
 
     def update_playhead(self, position):
@@ -997,14 +1101,33 @@ class Editor(QMainWindow):
         self.preview.update()
 
     def current_cue(self):
-        index = self.list.currentRow()
-        if self.project and 0 <= index < len(self.project.cues):
-            return self.project.cues[index]
+        selected = self.list.selectedIndexes()
+        if self.project and len(selected) == 1:
+            return self.project.cues[selected[0].row()]
         return None
 
+    def selected_rows(self):
+        return tuple(sorted(index.row() for index in self.list.selectedIndexes()))
+
+    def set_caption_selection(self, rows, seek):
+        rows = tuple(row for row in rows if 0 <= row < self.list.count())
+        selection = QItemSelection()
+        model = self.list.model()
+        for row in rows:
+            index = model.index(row, 0)
+            selection.select(index, index)
+        flags = QItemSelectionModel.SelectionFlag
+        selection_model = self.list.selectionModel()
+        previous = self.list.blockSignals(True)
+        selection_model.select(selection, flags.ClearAndSelect)
+        selection_model.setCurrentIndex(model.index(rows[0] if rows else -1, 0), flags.NoUpdate)
+        self.list.blockSignals(previous)
+        if rows:
+            self.list.scrollToItem(self.list.item(rows[0]))
+        self.select_cue(seek=seek)
+
     def refresh(self, index=None):
-        if index is None:
-            index = self.list.currentRow()
+        rows = self.selected_rows()
         self.list.blockSignals(True)
         self.list.clear()
         self.timeline.cues = self.project.cues if self.project else ()
@@ -1012,9 +1135,10 @@ class Editor(QMainWindow):
         for cue in self.timeline.cues:
             speaker = f" [{cue.speaker}]" if cue.speaker else ""
             self.list.addItem(f"{timestamp(cue.start_ms)}{speaker}   {cue.text}")
-        self.list.setCurrentRow(min(index, len(self.timeline.cues) - 1))
         self.list.blockSignals(False)
-        self.select_cue(self.list.currentRow(), seek=False)
+        if index is not None:
+            rows = (min(index, self.list.count() - 1),)
+        self.set_caption_selection(rows, False)
         label = f" · {Path(self.project.source).name}" if self.project else ""
         self.media_name.setText(
             Path(self.project.source).name if self.project else self.t("Sin video", "No video")
@@ -1027,9 +1151,25 @@ class Editor(QMainWindow):
         )
         self.transcribe_button.setEnabled(self.project is not None and self.job is None)
 
-    def select_cue(self, index, *, seek=True):
+    def select_cue(self, *, seek=True):
+        rows = self.selected_rows()
+        count = len(rows)
+        self.timeline.selection = frozenset(rows)
+        self.caption_title.setText(
+            self.t(f"Fragmentos ({count} seleccionados)", f"Captions ({count} selected)")
+            if count > 1
+            else self.t("Fragmentos", "Captions")
+        )
+        self.inspector.setEnabled(count == 1)
+        for button in self.single_caption_buttons:
+            button.setEnabled(count == 1)
+        self.delete_button.setEnabled(count > 0)
         cue = self.current_cue()
-        self.timeline.selection = index
+        if count == 1 and self.list.currentRow() != rows[0]:
+            index = self.list.model().index(rows[0], 0)
+            self.list.selectionModel().setCurrentIndex(
+                index, QItemSelectionModel.SelectionFlag.NoUpdate
+            )
         self.text.setText(cue.text if cue else "")
         self.speaker.setText(cue.speaker if cue else "")
         self.start.setValue(cue.start_ms / 1000 if cue else 0)
@@ -1259,8 +1399,12 @@ class Editor(QMainWindow):
         )
 
     def remove_cue(self):
-        if self.current_cue():
-            self.splice(self.list.currentRow(), 1, [])
+        if self.project is None or self.job is not None:
+            return
+        rows = self.timeline.selection
+        if rows:
+            cues = tuple(cue for index, cue in enumerate(self.project.cues) if index not in rows)
+            self.commit(self.project.with_cues(cues), min(rows))
 
     def save_preset(self):
         cue = self.current_cue()
@@ -1400,6 +1544,11 @@ def configure_application(app):
         for filename in ("segoeui.ttf", "segoeuib.ttf"):
             QFontDatabase.addApplicationFont(str(fonts / filename))
         app.setFont(QFont("Segoe UI", 9))
+    font = app.font()
+    if 0 < font.pointSizeF() < 10:
+        font.setPointSize(10)
+        app.setFont(font)
+    app.setPalette(retro_palette())
     app.setStyleSheet(STYLESHEET)
 
 
