@@ -9,6 +9,9 @@ from pitranscriptor import __version__
 from pitranscriptor.audio import prepare_audio
 from pitranscriptor.corpus import validate_corpus
 from pitranscriptor.diagnostics import environment_report
+from pitranscriptor.project import load_project, save_project, write_text
+from pitranscriptor.subtitles import render_subtitles
+from pitranscriptor.transcription import transcribe_project
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,7 +30,42 @@ def main(argv: list[str] | None = None) -> int:
     prepare = commands.add_parser("prepare-audio", help="Crear una copia WAV para evaluación local")
     prepare.add_argument("source", type=Path, help="Archivo original local")
     prepare.add_argument("destination", type=Path, help="Copia WAV nueva, sin sobrescribir")
+    transcribe = commands.add_parser("transcribe", help="Crear un proyecto con un modelo local")
+    transcribe.add_argument("source", type=Path)
+    transcribe.add_argument("destination", type=Path)
+    transcribe.add_argument("--model", type=Path, required=True)
+    transcribe.add_argument("--language", choices=("es", "en", "auto"), default="es")
+    transcribe.add_argument("--prompt", type=Path, help="Archivo UTF-8 con pistas opcionales")
+    transcribe.add_argument("--target", type=int, choices=range(1, 8), default=4)
+    export = commands.add_parser("export-subtitles", help="Exportar el texto de un proyecto")
+    export.add_argument("project", type=Path)
+    export.add_argument("destination", type=Path)
     args = parser.parse_args(argv)
+    if args.command in ("transcribe", "export-subtitles"):
+        try:
+            if args.destination.exists():
+                raise FileExistsError("La salida ya existe")
+            if args.command == "transcribe":
+                project = transcribe_project(
+                    args.source,
+                    args.model,
+                    language=None if args.language == "auto" else args.language,
+                    vocabulary=args.prompt.read_text(encoding="utf-8") if args.prompt else None,
+                    target=args.target,
+                )
+                save_project(args.destination, project)
+                print(f"Proyecto creado con {len(project.cues)} fragmentos")
+            else:
+                suffix = args.destination.suffix.lower()
+                if suffix not in {".srt", ".vtt"}:
+                    raise ValueError("Elige una extensión .srt o .vtt")
+                cues = load_project(args.project).cues
+                write_text(args.destination, render_subtitles(cues, webvtt=suffix == ".vtt"))
+                print(f"Exportados {len(cues)} fragmentos")
+        except (OSError, ValueError, RuntimeError) as error:
+            print(error, file=sys.stderr)
+            return 1
+        return 0
     if args.command == "prepare-audio":
         try:
             result = prepare_audio(args.source, args.destination)

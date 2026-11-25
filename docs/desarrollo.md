@@ -64,6 +64,16 @@ Para preparar audios propios, seguir [las instrucciones del corpus](pruebas-reco
 
 `pitranscriptor prepare-audio ORIGEN DESTINO.wav` utiliza el extra `research` para crear una copia PCM16 mono a 16 kHz. Rechaza sobrescribir, usar el original como salida, archivos sin una única pista o de más de cinco minutos. Elimina copias incompletas si falla y verifica que el hash del original no cambió.
 
+Con un modelo multilingüe CTranslate2 ya instalado en `models/faster-whisper-small`, el núcleo se puede ejecutar desde la raíz del repositorio:
+
+```console
+uv run --frozen --extra research pitranscriptor transcribe video.mp4 outputs/video.pitranscriptor --model models/faster-whisper-small --language es
+uv run --frozen pitranscriptor export-subtitles outputs/video.pitranscriptor outputs/video.srt
+uv run --frozen pitranscriptor export-subtitles outputs/video.pitranscriptor outputs/video.vtt
+```
+
+Los tiempos por palabra son estimaciones del modelo. Si la cantidad de palabras cambia al editar un fragmento, se conservan los tiempos del fragmento y se retiran las marcas individuales para evitar atribuir precisión a palabras nuevas. La decodificación considera el desfase inicial de la primera pista de audio frente al video. El material con discontinuidades complejas requiere comprobación manual de sincronía.
+
 ## Matriz inicial, objetivos y evidencia
 
 | Plataforma x86-64 | Ruta prevista | Validación |
