@@ -35,5 +35,10 @@ jobs:
           fi
           uv pip install --python "$PYTHON" --no-deps dist/*.whl
           "$PYTHON" -I -m pitranscriptor --version
+      - name: Bibliotecas nativas para Qt en Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libopengl0 libgl1 libxkbcommon0
       - run: uv sync --locked --all-extras
       - run: uv run --frozen --all-extras python scripts/check_runtime.py

@@ -31,6 +31,15 @@ El diagnóstico informa presencia de paquetes y de `ffmpeg`/`ffprobe` en PATH; n
 
 Para las comprobaciones opcionales:
 
+En Ubuntu, instalar primero las bibliotecas nativas de Qt (también necesarias en runners sin escritorio):
+
+```console
+sudo apt-get update
+sudo apt-get install --no-install-recommends -y libegl1 libopengl0 libgl1 libxkbcommon0
+```
+
+Después, en Windows o Linux:
+
 ```console
 uv sync --locked --all-extras
 uv run --frozen --all-extras python scripts/check_runtime.py
