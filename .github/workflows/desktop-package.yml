@@ -30,7 +30,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y libegl1 libgl1 libopengl0 libpulse0 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0
+          sudo apt-get install --no-install-recommends -y \
+            libegl1 libgl1 libopengl0 libpulse0 libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-xinerama0 libxcb-xkb1 libxrender1 libxi6 libsm6 libice6 libfontconfig1 \
+            xvfb xauth weston fonts-dejavu-core
       - run: uv sync --locked --all-extras --group package
       - run: uv run --frozen --all-extras --group package python scripts/build_desktop.py
       - name: Install and start on Windows
@@ -52,3 +56,22 @@ jobs:
           tar -xzf dist/desktop/Pitranscriptor-linux-x86_64.tar.gz -C "$stage"
           sh "$stage/install-linux.sh" "$RUNNER_TEMP/Pitranscriptor smoke"
           "$RUNNER_TEMP/Pitranscriptor smoke/Pitranscriptor" --self-test
+      - name: Start on X11 and Wayland
+        if: runner.os == 'Linux'
+        run: |
+          app="$RUNNER_TEMP/Pitranscriptor smoke/Pitranscriptor"
+          QT_QPA_PLATFORM=xcb xvfb-run -a "$app" --self-test
+          export XDG_RUNTIME_DIR
+          XDG_RUNTIME_DIR=$(mktemp -d)
+          weston --backend=headless-backend.so --socket=pitranscriptor-ci > "$RUNNER_TEMP/weston.log" 2>&1 &
+          compositor=$!
+          trap 'kill "$compositor" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if test -S "$XDG_RUNTIME_DIR/pitranscriptor-ci"; then break; fi
+            sleep 1
+          done
+          if ! test -S "$XDG_RUNTIME_DIR/pitranscriptor-ci"; then
+            cat "$RUNNER_TEMP/weston.log"
+            exit 1
+          fi
+          QT_QPA_PLATFORM=wayland WAYLAND_DISPLAY=pitranscriptor-ci "$app" --self-test
