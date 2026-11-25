@@ -1216,13 +1216,26 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="pitranscriptor-desktop")
     parser.add_argument("project", type=Path, nargs="?")
     parser.add_argument("--language", choices=("es", "en"))
+    parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.self_test:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication([sys.argv[0]])
     app.setOrganizationName("sudo_pita")
     app.setApplicationName("Pitranscriptor")
     configure_application(app)
     settings = QSettings("sudo_pita", "Pitranscriptor")
     editor = Editor(args.language or settings.value("language", "es"))
+    if args.self_test:
+        import av
+        import ctranslate2
+        import faster_whisper.audio
+
+        if not ctranslate2.get_supported_compute_types("cpu"):
+            return 1
+        av.Codec("libx264", "w")
+        av.Codec("aac", "w")
+        return 0 if not editor.grab().isNull() and faster_whisper.audio.decode_audio else 1
     editor.show()
     if args.project:
         editor.load_path(args.project)

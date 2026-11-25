@@ -19,8 +19,11 @@ Decisión del autor del 25 de noviembre de 2026: código propio bajo **GPL-3.0-o
 | uv | [MIT/Apache-2.0 y terceros](https://github.com/astral-sh/uv) | Herramienta de desarrollo; no incorporada al producto final |
 | Hatchling, pytest, Ruff y transitivas | Metadatos de las versiones fijadas en `uv.lock` y sus licencias | Herramientas de desarrollo; no incluirlas por defecto en instaladores |
 | Tipografías y recursos visuales | Depende del archivo y procedencia | No se agrega ninguna fuente ni recurso de terceros |
+| PyInstaller | [Licencia y excepción para aplicaciones empaquetadas](https://pyinstaller.org/en/stable/license.html) | Construcción y pruebas locales con 6.22.3. La distribución conserva las licencias de la aplicación y los avisos disponibles de las dependencias |
 
 Esta es una revisión inicial, no una autorización completa de futuros instaladores. `uv.lock` fija las dependencias transitivas; antes de distribuir se inventariarán **todos** los paquetes efectivos, bibliotecas nativas, códecs y modelos, con textos, avisos y fuentes de sus versiones. Revisar especialmente FFmpeg incluido en PyAV, no solo un posible `ffmpeg.exe`. No redistribuir combinaciones marcadas `nonfree`. La licencia del proyecto no resuelve por sí sola derechos sobre códecs o medios.
+
+Los instaladores de prueba se construyen en local y CI. El flujo de compilación copia los avisos proporcionados por los paquetes y registra sus versiones. Antes de publicar binarios, falta comprobar que las compilaciones concretas de FFmpeg, H.264 y Qt instaladas con las ruedas admitan redistribución en los términos elegidos y preparar sus fuentes y avisos correspondientes. La compilación excluye las grabaciones, los pesos y las bibliotecas CUDA del entorno de prueba.
 
 ## Grabaciones de pruebas
 

@@ -1,0 +1,54 @@
+name: Desktop package smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+      - 'packaging/**'
+      - 'scripts/build_desktop.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/desktop-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.10'
+      - name: Install Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libgl1 libopengl0 libpulse0 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0
+      - run: uv sync --locked --all-extras --group package
+      - run: uv run --frozen --all-extras --group package python scripts/build_desktop.py
+      - name: Install and start on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $PWD 'dist/desktop/Pitranscriptor-Setup.exe'
+          $target = Join-Path $env:RUNNER_TEMP 'Pitranscriptor smoke'
+          $arguments = '--target "{0}"' -f $target
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+          $application = Join-Path $target 'Pitranscriptor.exe'
+          $process = Start-Process -FilePath $application -ArgumentList '--self-test' -Wait -PassThru
+          exit $process.ExitCode
+      - name: Install and start on Linux
+        if: runner.os == 'Linux'
+        run: |
+          stage=$(mktemp -d)
+          tar -xzf dist/desktop/Pitranscriptor-linux-x86_64.tar.gz -C "$stage"
+          sh "$stage/install-linux.sh" "$RUNNER_TEMP/Pitranscriptor smoke"
+          "$RUNNER_TEMP/Pitranscriptor smoke/Pitranscriptor" --self-test

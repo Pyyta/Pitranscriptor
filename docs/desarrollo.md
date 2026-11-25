@@ -80,6 +80,17 @@ Para abrir el editor, ejecutar `uv sync --locked --all-extras` y luego `uv run -
 
 **Archivo → Exportar video** aplica en MP4 o MOV la misma composición de la vista previa. La exportación H.264 permite ajustar calidad, altura máxima y cuadros por segundo. Conservar el valor original mantiene los tiempos de los cuadros cuando el archivo proporciona marcas temporales. La resolución queda limitada a la del original y se redondea a dimensiones pares para H.264. La primera pista AAC se copia. Para otras pistas se usa AAC con un máximo de dos canales y la aplicación indica la conversión al terminar. Se comprobó rotación de metadatos, orientación vertical, recodificación de PCM, copia AAC y cancelación con clips de prueba. Para fuentes HDR, códecs alternativos y archivos con varias pistas, quedan pendientes pruebas de conservación de características.
 
+## Construir un instalador de prueba
+
+En Windows o Linux x86-64, ejecutar desde la raíz del proyecto:
+
+```console
+uv sync --locked --all-extras --group package
+uv run --frozen --all-extras --group package python scripts/build_desktop.py
+```
+
+En Windows, `dist/desktop/Pitranscriptor-Setup.exe` instala en una carpeta nueva del usuario y añade un acceso al menú Inicio al usar la interfaz. La compilación de prueba carece de firma digital. En Linux, extraer `dist/desktop/Pitranscriptor-linux-x86_64.tar.gz` y ejecutar `sh install-linux.sh` desde el directorio extraído. Para una instalación de prueba en otra carpeta, pasarla como argumento. Las compilaciones de CI se realizan en Windows y Ubuntu 22.04. Los binarios quedan en el entorno de compilación y los modelos se descargan desde la aplicación.
+
 ## Matriz inicial, objetivos y evidencia
 
 | Plataforma x86-64 | Ruta prevista | Validación |
