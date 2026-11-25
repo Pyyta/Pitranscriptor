@@ -1,0 +1,39 @@
+name: Base de desarrollo
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  base:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.10"
+      - run: uv sync --locked
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen ruff format --check .
+      - run: uv run --frozen pytest
+      - run: uv run --frozen pitranscriptor doctor --json
+      - run: uv run --frozen python scripts/verify_build.py
+      - run: uv build --no-build-isolation
+      - run: uv venv .cache/wheel-smoke
+      - name: Instalar wheel en entorno limpio
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PYTHON=.cache/wheel-smoke/Scripts/python.exe
+          else
+            PYTHON=.cache/wheel-smoke/bin/python
+          fi
+          uv pip install --python "$PYTHON" --no-deps dist/*.whl
+          "$PYTHON" -I -m pitranscriptor --version
+      - run: uv sync --locked --all-extras
+      - run: uv run --frozen --all-extras python scripts/check_runtime.py

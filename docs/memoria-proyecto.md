@@ -7,8 +7,8 @@
 - **Nombre:** Pitranscriptor. **Autor y marca:** sudo_pita.
 - **Repositorio público:** https://github.com/Pyyta/Pitranscriptor. Rama inicial `main`; remoto `origin`.
 - **Ubicación inicial del proyecto:** `C:\Users\danyp\Documents\ChatGPT\New project`. La ubicación puede cambiar si se clona o se usa otro entorno; el repositorio es la referencia portable.
-- **Estado al redactar:** requisitos y planificación documentados. Commit inicial `bfdd8ce` (`docs: define Pitranscriptor requirements and architecture`) publicado. No hay aplicación, instaladores, modelos integrados ni compatibilidad probada.
-- **Alcance autorizado hasta ahora:** el usuario pidió explícitamente planificar, crear el repositorio e idear el proyecto, tras haber pedido no programar todavía. No debe interpretarse que ya se implementó el producto. Nuevas peticiones explícitas del usuario pueden autorizar implementación.
+- **Estado actual:** fase 1 en implementación. Base Python instalable, diagnóstico local, dependencias bloqueadas, scripts de validación y CI configurados. No hay editor, transcripción integrada, modelos ni instaladores. Véase [desarrollo](desarrollo.md) para distinguir objetivos de compatibilidad de pruebas reales.
+- **Alcance autorizado:** inicialmente el usuario pidió planificar sin programar; el 25 de noviembre de 2026 pidió empezar la primera fase de creación y mantener commits y push de cada progreso relevante. Esta instrucción autoriza la implementación de la preparación técnica.
 - El repositorio es público: esta memoria, el código y su historial pueden ser vistos por terceros. No registrar datos privados, contraseñas, tokens, videos o audios personales.
 
 ## Contexto y objetivo
@@ -67,7 +67,7 @@ Prioridades de la primera versión indicadas por el usuario: **transcripción pr
 
 ## Arquitectura propuesta, no definitiva
 
-Python/PySide6 para escritorio, FFmpeg/ffprobe para medios y faster-whisper con modelos multilingües para investigación inicial. Estas tecnologías son candidatas, no garantías ni implementación existente. Evaluar precisión y coste de CPU/GPU con muestras reales antes de seleccionarlas. Vega 8 no estaba entre las GPU AMD de los binarios ROCm de CTranslate2 consultados al planificar; tratar CPU como alternativa y volver a verificar la documentación y el hardware en el momento de implementar. Separar proveedores de transcripción, dominio, editor, persistencia y exportación. Véase [arquitectura.md](arquitectura.md).
+Python/PySide6 para escritorio, FFmpeg/ffprobe para medios y faster-whisper con modelos multilingües para investigación inicial. La fase 1 fija versiones de evaluación en `pyproject.toml` y `uv.lock`; su importación no demuestra precisión ni integración del producto. Evaluar precisión y coste de CPU/GPU con muestras reales antes de seleccionar modelos. Vega 8 no estaba entre las GPU AMD de los binarios ROCm de CTranslate2 consultados al planificar; tratar CPU como alternativa y verificar documentación y hardware al implementar. Separar proveedores de transcripción, dominio, editor, persistencia y exportación. Véase [arquitectura.md](arquitectura.md).
 
 ## Redes proporcionadas por el usuario
 
@@ -85,4 +85,12 @@ Python/PySide6 para escritorio, FFmpeg/ffprobe para medios y faster-whisper con 
 - [Vocabulario](vocabulario.md): lista íntegra de términos entregados por el usuario.
 - [AGENTS.md](../AGENTS.md): instrucciones de trabajo para futuras sesiones sobre el repositorio.
 
-El siguiente trabajo de desarrollo propuesto es validar el reconocimiento con muestras autorizadas de español-inglés, el vocabulario y hardware disponible; después implementar iterativamente el núcleo de edición y exportación según el plan. No se han seleccionado proveedor conectado, licencia del proyecto, formatos definitivos de instalación en Linux ni versiones finales de modelos/dependencias. Registrar nuevas decisiones y resultados verificables aquí o en el documento especializado correspondiente.
+## Avances de fase 1 — 25 de noviembre de 2026
+
+- Usuario autoriza iniciar la implementación, elige **GPL-3.0** (registrada como GPL-3.0-only) y **grabaciones propias** para las pruebas. Se conserva la planificación original como historial; la licencia ya no está pendiente.
+- Base instalable `src/pitranscriptor`, comandos de versión/diagnóstico, Python 3.12.16 aislado, uv 0.13.10, dependencias directas y transitivas bloqueadas. Qt Essentials y reconocimiento son extras; no se descargan modelos.
+- Verificado localmente en Windows 11 x86-64 con Ryzen 7 7445HS: dos pruebas de CLI aprobadas, Ruff aprobado, etiqueta Qt renderizada offscreen, importación de faster-whisper y tipos CPU `float32`, `int8`, `int8_float32` informados por CTranslate2. Dos construcciones consecutivas producen los mismos hashes de wheel y sdist.
+- El equipo informa Radeon 740M y RTX 3050 Laptop; no se ejecutó reconocimiento ni cómputo GPU. `ffmpeg` y `ffprobe` no están en PATH. No se probaron Windows 10, Linux gráfico, Vega 8 ni precisión.
+- CI configurado para Windows y Ubuntu 22.04/24.04; configurar un job no equivale a haberlo aprobado. [Desarrollo](desarrollo.md) documenta comandos y límites; [licencias](licencias.md) registra revisión inicial y obligaciones pendientes antes de distribuir.
+
+El siguiente trabajo es preparar las muestras propias autorizadas y validar reconocimiento español-inglés, vocabulario y hardware disponible; después implementar el núcleo de edición y exportación según el plan. Siguen abiertos proveedor conectado, modelos predeterminados, formatos finales de instalación Linux y la revisión completa de binarios a redistribuir.

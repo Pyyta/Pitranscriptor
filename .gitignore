@@ -10,14 +10,32 @@
 *.pitranscriptor
 models/
 outputs/
+data/local/
+reports/local/
+*.flac
+*.m4a
+*.ogg
+*.aac
+*.avi
+*.m4v
+*.m4b
+*.opus
+*.wma
+*.aiff
 
 # Python and build artifacts
 __pycache__/
 *.py[cod]
 .venv/
+.tools/
+.cache/
 build/
 dist/
 .pytest_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
 # Local secrets and system files
 .env

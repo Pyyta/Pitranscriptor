@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pitranscriptor"
+version = "0.1.0.dev0"
+description = "Base de desarrollo de Pitranscriptor, editor de subtítulos de sudo_pita."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{name = "sudo_pita"}]
+dependencies = []
+
+[project.optional-dependencies]
+desktop = ["PySide6-Essentials==6.12.0"]
+research = ["faster-whisper==1.2.1", "ctranslate2==4.9.1"]
+
+[project.scripts]
+pitranscriptor = "pitranscriptor.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Pyyta/Pitranscriptor"
+
+[dependency-groups]
+dev = ["hatchling==1.33.0", "pytest==9.2.0", "ruff==0.17.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pitranscriptor"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/scripts", "/docs", "/.python-version", "/uv.lock"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.uv]
+required-version = "==0.13.10"
+environments = ["sys_platform == 'win32'", "sys_platform == 'linux'"]

@@ -40,5 +40,5 @@
 
 - Modo conectado: proveedor gratuito, límites, consentimiento y tratamiento de audio.
 - Instalador Linux: formatos concretos y distribuciones objetivo a partir de pruebas reales. Windows: instalador y compatibilidad de versiones por comprobar.
-- Licencia del proyecto, modelos redistribuibles, fuentes y condiciones de sus dependencias.
+- Modelos redistribuibles, fuentes y condiciones de sus dependencias. Licencia del código propio resuelta en fase 1: GPL-3.0-only por elección del usuario.
 - Asignación automática de colores por hablante: se contempla con corrección manual y queda sujeta a pruebas.

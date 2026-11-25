@@ -1,8 +1,8 @@
 # Pitranscriptor
 
-Aplicación de escritorio planificada para crear y editar subtítulos dinámicos en videos cortos. Creada por **sudo_pita**.
+Aplicación de escritorio en desarrollo para crear y editar subtítulos dinámicos en videos cortos. Creada por **sudo_pita**.
 
-> Estado: planificación. La aplicación y sus instaladores todavía no se han implementado.
+> Estado: fase 1, preparación técnica. Ya existe una base Python instalable con diagnóstico local; el editor, la transcripción y los instaladores siguen pendientes.
 
 Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte para videos verticales y horizontales de hasta cinco minutos. Su prioridad es transcribir español e inglés, especialmente cuando se mezclan términos tecnológicos, y permitir corregir cada palabra y personalizar cada fragmento.
 
@@ -13,6 +13,20 @@ Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte par
 - [Arquitectura y decisiones técnicas](docs/arquitectura.md)
 - [Plan de trabajo y pruebas](docs/plan.md)
 - [Vocabulario tecnológico inicial](docs/vocabulario.md)
+- [Entorno, comandos y matriz de validación](docs/desarrollo.md)
+- [Licencia y revisión de componentes](docs/licencias.md)
+
+## Desarrollo
+
+Con Python y [uv](https://docs.astral.sh/uv/) 0.13.10 instalados, desde el repositorio:
+
+```console
+uv sync --locked
+uv run --frozen pitranscriptor doctor
+uv run --frozen pytest
+```
+
+`uv` utiliza la versión de Python indicada en `.python-version` y crea `.venv`. La primera instalación requiere internet. Consulta [desarrollo](docs/desarrollo.md) para dependencias opcionales y compilación. Estos comandos son para desarrollo; todavía no abren un editor de video.
 
 ## Autor
 
@@ -21,4 +35,4 @@ Pitranscriptor está pensada para Windows 10 o superior y Linux, con soporte par
 - [YouTube](https://www.youtube.com/@sudo_pita)
 - [Facebook](https://www.facebook.com/profile.php?id=61589854056244)
 
-Las instrucciones de instalación se añadirán cuando exista una versión funcional y se hayan probado los instaladores. La licencia del proyecto y las condiciones de sus dependencias deben definirse antes de la primera distribución.
+Código propio bajo [GNU GPL versión 3 exclusivamente (GPL-3.0-only)](LICENSE), elegida por el autor. Los componentes de terceros conservan sus condiciones. Las instrucciones de instalación para usuarios finales se añadirán cuando existan instaladores probados.

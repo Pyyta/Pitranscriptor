@@ -13,6 +13,8 @@
 
 ## Pruebas de aceptación
 
+Estado de fase 1: base Python y licencia implementadas; matriz de sistemas y CI preparados; validación de dependencias y compilación ejecutadas localmente en Windows 11. La preparación de grabaciones propias continúa; no hay aún mediciones de reconocimiento. Evidencia y decisiones en la [memoria](memoria-proyecto.md).
+
 - Transcribir muestras español/inglés con las palabras del vocabulario, comparándolas contra texto revisado; registrar resultados sin prometer reconocimiento perfecto.
 - Probar audios con silencio, música moderada, muletillas y dos hablantes; verificar que el usuario pueda corregir el resultado y los colores.
 - Comprobar cuatro palabras como objetivo, hasta siete cuando sea apropiado, ninguna pérdida de palabras y ningún fragmento que supere siete.

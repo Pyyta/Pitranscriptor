@@ -2,6 +2,8 @@
 
 Estas son decisiones iniciales, no compatibilidades ya comprobadas. Se definirán versiones exactas tras prototipos y pruebas en Windows y Linux.
 
+La fase 1 incorpora una base Python de preparación con versiones de evaluación fijadas en `pyproject.toml`/`uv.lock`, extras independientes para Qt Essentials y reconocimiento, y scripts de construcción. Véase [desarrollo](desarrollo.md) para comandos, matriz y límites reales. Los componentes del editor y de exportación descritos abajo siguen planificados.
+
 ## Tecnología candidata
 
 - **Interfaz:** Python y PySide6/Qt, con reproducción de video y componentes propios para vista previa y línea de tiempo. Diseñar la escena de subtítulos compartida entre previsualización y exportación; verificar fidelidad entre ambas.
@@ -43,7 +45,7 @@ Pitranscriptor/
 └── scripts/              # tareas de desarrollo
 ```
 
-Los directorios de código se crearán al implementar; este árbol describe la intención y puede cambiar con los prototipos.
+`src/pitranscriptor`, `tests` y `scripts` ya existen en fase 1; `resources` y `packaging` se crearán cuando se necesiten. El resto del árbol describe la intención y puede cambiar con los prototipos.
 
 ## Referencias primarias
 
