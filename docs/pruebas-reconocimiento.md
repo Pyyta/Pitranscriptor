@@ -61,3 +61,22 @@ El validador acepta conjuntos parciales para poder preparar una muestra a la vez
 Comparar modelos multilingües en CPU, y NVIDIA solo si se puede verificar, con y sin pistas del vocabulario. Registrar modelo y revisión exactos, cuantización, equipo, configuración, tiempo, memoria y errores de términos junto con WER y CER. Conservar resultados sin normalizar y una política de normalización documentada; evaluar silencio por palabras inventadas (WER no está definida con referencia vacía). No eliminar muletillas antes de medir reconocimiento.
 
 Los resultados privados y cualquier detalle de voces quedan en `reports/local/`. Publicar solo resúmenes revisados que no expongan audio, transcripciones personales o datos identificables. Hay una referencia real revisada; aún faltan otras voces, inglés completo, silencio y más referencias para una evaluación representativa.
+
+## Primer ensayo con referencia confirmada
+
+El 25 de noviembre de 2026 se procesó una muestra de 20,957 segundos y 39 palabras con referencia confirmada por el usuario. Modelo de investigación: `Systran/faster-whisper-small`, revisión `536b0662742c02347bc0e980a01041f333bce120`; faster-whisper 1.2.1, CTranslate2 4.9.1 y PyAV 18.1.1; CPU Ryzen 7 7445HS, int8, 8 hilos. Configuración: español, transcribir sin traducir, beam 5, temperatura 0, VAD y tiempos por palabra, sin condicionar el texto al segmento anterior.
+
+| Condición | WER | CER con espacios | Términos exactos | Tiempo de transcripción |
+| --- | --- | --- | --- | --- |
+| Sin pistas | 25,64 % | 6,09 % | 8/16 | 6,11 s |
+| Con los 16 términos del guion como pista | 0 % | 0 % | 16/16 | 6,27 s |
+
+Los tiempos excluyen descarga y carga inicial del modelo. Solo se midió una ejecución por condición, no una distribución de rendimiento. El 0 % corresponde a esta muestra guionada y a la normalización descrita abajo; **no demuestra precisión perfecta**, no evalúa generalización a nuevas grabaciones y no mide calidad de puntuación, tiempos o diarización. Las pistas incluían términos esperados de ese guion, por lo que falta probarlas frente a audios nuevos para detectar omisiones o palabras inventadas. Aún no se compararon otros modelos o GPU.
+
+### Política de métricas
+
+El módulo `pitranscriptor.evaluation` implementa Levenshtein, WER y CER: sustituciones + inserciones + eliminaciones, dividido por unidades de referencia. WER usa palabras; CER incluye los espacios de la cadena normalizada. Política `nfc-casefold-punctuation-to-space-v1`: normalización Unicode NFC, comparación sin mayúsculas/minúsculas, puntuación reemplazada por espacios y espacios colapsados; se conservan acentos. Se conservan también los textos originales en los informes privados.
+
+Las tasas pueden superar el 100 % por inserciones. Con referencia vacía, la tasa es `null` y se informa el número de errores sin inventar un porcentaje. Los términos se cotejan por palabras/frases completas, sin contar subcadenas, y deben existir en la referencia revisada. Esto mide presencia exacta, no todas las ocurrencias ni variantes fonéticas.
+
+Los borradores, textos, marcas por palabra, hashes y mediciones detalladas permanecen en `reports/local/`; las otras tres muestras técnicas siguen pendientes de revisión humana antes de puntuarlas.

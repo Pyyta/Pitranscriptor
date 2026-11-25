@@ -23,6 +23,8 @@
 
 La preparación técnica y la primera muestra revisada están disponibles. Hay tres copias técnicas adicionales pendientes de referencia y primeros borradores experimentales en CPU. La evaluación representativa y la comparación de modelos siguen abiertas. Evidencia y decisiones en la [memoria](memoria-proyecto.md); procedimiento en [pruebas de reconocimiento](pruebas-reconocimiento.md).
 
+La fase 2 tiene un primer ensayo medido en una referencia confirmada, con el mismo modelo small en CPU y con/sin pistas. No se considera terminada: faltan más referencias, modelos comparables, otras condiciones de audio y validación de GPU cuando sea viable.
+
 ## Pruebas de aceptación
 
 - Transcribir muestras español/inglés con las palabras del vocabulario, comparándolas contra texto revisado; registrar resultados sin prometer reconocimiento perfecto.
