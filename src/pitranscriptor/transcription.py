@@ -54,6 +54,8 @@ def transcribe_project(
     try:
         import av
         from faster_whisper import WhisperModel
+        from faster_whisper.audio import decode_audio
+        from faster_whisper.vad import VadOptions, get_speech_timestamps
     except ImportError as error:
         raise ValueError("Instala el extra research para transcribir") from error
 
@@ -78,12 +80,35 @@ def transcribe_project(
     last_end = 0
     try:
         with source.open("rb") as audio:
+            input_audio = audio
+            clips = "0"
+            mixed = language == "mixed"
+            if mixed:
+                if not model.model.is_multilingual:
+                    raise ValueError("El modo mixto requiere un modelo multilingüe")
+                rate = model.feature_extractor.sampling_rate
+                input_audio = decode_audio(audio, sampling_rate=rate)
+                speech = get_speech_timestamps(
+                    input_audio, VadOptions(min_silence_duration_ms=180, speech_pad_ms=80), rate
+                )
+                if cancelled():
+                    raise InterruptedError("Transcripción cancelada")
+                if not speech:
+                    progress(100)
+                    return Project(str(source), duration)
+                clips = [
+                    tick / rate
+                    for interval in speech
+                    for tick in (interval["start"], interval["end"])
+                ]
             segments, _ = model.transcribe(
-                audio,
-                language=language,
+                input_audio,
+                language=None if mixed else language,
                 task="transcribe",
                 word_timestamps=True,
-                vad_filter=True,
+                multilingual=mixed,
+                vad_filter=not mixed,
+                clip_timestamps=clips,
                 beam_size=5,
                 temperature=0,
                 condition_on_previous_text=False,

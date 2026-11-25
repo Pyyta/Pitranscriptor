@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     transcribe.add_argument("source", type=Path)
     transcribe.add_argument("destination", type=Path)
     transcribe.add_argument("--model", type=Path, required=True)
-    transcribe.add_argument("--language", choices=("es", "en", "auto"), default="es")
+    transcribe.add_argument("--language", choices=("es", "en", "mixed", "auto"), default="es")
     transcribe.add_argument("--prompt", type=Path, help="Archivo UTF-8 con pistas opcionales")
     transcribe.add_argument("--target", type=int, choices=range(1, 8), default=4)
     transcribe.add_argument("--device", choices=("cpu", "cuda"), default="cpu")

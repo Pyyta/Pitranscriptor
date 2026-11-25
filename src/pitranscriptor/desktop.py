@@ -301,7 +301,9 @@ class Editor(QMainWindow):
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._button(self.t("Abrir video", "Open video"), self.open_video))
         toolbar.addWidget(self._button(self.t("Modelo…", "Model…"), self.choose_model))
-        self.language_mode = self._combo([("Español", "es"), ("English", "en"), ("Auto", None)])
+        self.language_mode = self._combo(
+            [("Español + English", "mixed"), ("Español", "es"), ("English", "en"), ("Auto", None)]
+        )
         toolbar.addWidget(self.language_mode)
         self.device = self._combo([("CPU", "cpu"), ("NVIDIA CUDA", "cuda")])
         toolbar.addWidget(self.device)
