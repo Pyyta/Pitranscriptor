@@ -16,18 +16,19 @@ STALL_SECONDS = 180
 
 
 def worker(folder: Path) -> int:
-    with (folder / "progress").open("w", encoding="utf-8", buffering=1) as progress:
-        try:
-            request = json.loads((folder / "request.json").read_text(encoding="utf-8"))
-            source = Path(request.pop("source"))
-            model = Path(request.pop("model"))
-            project = transcribe_project(
-                source, model, progress=lambda value: print(value, file=progress), **request
-            )
-            save_project(folder / "project.pitranscriptor", project)
-        except Exception as error:
-            (folder / "error").write_text(str(error), encoding="utf-8")
-            return 1
+    def report(value):
+        with (folder / "progress").open("a", encoding="utf-8") as progress:
+            print(value, file=progress)
+
+    try:
+        request = json.loads((folder / "request.json").read_text(encoding="utf-8"))
+        source = Path(request.pop("source"))
+        model = Path(request.pop("model"))
+        project = transcribe_project(source, model, progress=report, **request)
+        save_project(folder / "project.pitranscriptor", project)
+    except Exception as error:
+        (folder / "error").write_text(str(error), encoding="utf-8")
+        return 1
     return 0
 
 
@@ -40,7 +41,10 @@ def run_transcription(source, model, *, progress, cancelled, **options):
     command.append(WORKER_FLAG)
     env = dict(os.environ, HF_HUB_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    with TemporaryDirectory(prefix="pitranscriptor-transcription-") as directory:
+    # Windows puede retener un archivo recién cerrado durante un análisis en segundo plano.
+    with TemporaryDirectory(
+        prefix="pitranscriptor-transcription-", ignore_cleanup_errors=True
+    ) as directory:
         folder = Path(directory)
         (folder / "request.json").write_text(
             json.dumps(dict(source=str(source.resolve()), model=str(model.resolve()), **options)),
@@ -61,7 +65,7 @@ def run_transcription(source, model, *, progress, cancelled, **options):
                         raise InterruptedError("Transcripción cancelada")
                     try:
                         updates = (folder / "progress").read_text(encoding="utf-8")
-                    except FileNotFoundError:
+                    except (FileNotFoundError, PermissionError):
                         updates = ""
                     if updates != previous and updates.endswith("\n"):
                         previous = updates
