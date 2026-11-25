@@ -76,6 +76,8 @@ Los tiempos por palabra son estimaciones del modelo. Si la cantidad de palabras 
 
 Para abrir el editor, ejecutar `uv sync --locked --all-extras` y luego `uv run --frozen --all-extras pitranscriptor-desktop`. Elegir el video y seleccionar una carpeta de modelo instalado mediante **Modelo…**. Los fragmentos se pueden editar desde la lista, mover arrastrando en la vista previa pausada y guardar como proyecto. La línea de tiempo muestra forma de onda y admite búsqueda, zoom y velocidades de reproducción. Se puede cambiar el idioma desde el menú para el próximo inicio.
 
+**Archivo → Exportar video** aplica en MP4 o MOV la misma composición de la vista previa. La exportación H.264 permite ajustar calidad, altura máxima y cuadros por segundo. Conservar el valor original mantiene los tiempos de los cuadros cuando el archivo proporciona marcas temporales. La resolución queda limitada a la del original y se redondea a dimensiones pares para H.264. La primera pista AAC se copia. Para otras pistas se usa AAC con un máximo de dos canales y la aplicación indica la conversión al terminar. Se comprobó rotación de metadatos, orientación vertical, recodificación de PCM, copia AAC y cancelación con clips de prueba. Para fuentes HDR, códecs alternativos y archivos con varias pistas, quedan pendientes pruebas de conservación de características.
+
 ## Matriz inicial, objetivos y evidencia
 
 | Plataforma x86-64 | Ruta prevista | Validación |

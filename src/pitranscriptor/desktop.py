@@ -6,6 +6,7 @@ import os
 import sys
 from bisect import bisect_right
 from dataclasses import asdict, replace
+from fractions import Fraction
 from pathlib import Path
 from threading import Event
 
@@ -16,6 +17,8 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
     QFileDialog,
     QFontComboBox,
@@ -40,6 +43,7 @@ from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
 from pitranscriptor.subtitles import Cue, Style, Word, render_subtitles
 from pitranscriptor.transcription import inspect_media, transcribe_project
+from pitranscriptor.video_export import export_video
 from pitranscriptor.waveform import audio_peaks
 
 
@@ -252,6 +256,7 @@ class Editor(QMainWindow):
         self._action(
             file, self.t("Exportar WebVTT…", "Export WebVTT…"), lambda: self.export_text("vtt")
         )
+        self._action(file, self.t("Exportar video…", "Export video…"), self.export_movie)
         edit = self.menuBar().addMenu(self.t("Editar", "Edit"))
         self._action(edit, self.t("Deshacer", "Undo"), self.undo, QKeySequence.StandardKey.Undo)
         self._action(edit, self.t("Rehacer", "Redo"), self.redo, QKeySequence.StandardKey.Redo)
@@ -637,6 +642,92 @@ class Editor(QMainWindow):
             self.model_path = Path(path)
             self.settings.setValue("model", path)
             self.statusBar().showMessage(path)
+
+    def export_movie(self):
+        if self.project is None or self.job is not None:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.t("Exportar video", "Export video"))
+        form = QFormLayout(dialog)
+        file_format = self._combo([("MP4", "mp4"), ("MOV", "mov")])
+        quality = self._combo(
+            [
+                (self.t(es, en), code)
+                for es, en, code in (
+                    ("Muy alta", "Very high", "original"),
+                    ("Alta", "High", "high"),
+                    ("Media", "Medium", "medium"),
+                    ("Baja", "Low", "low"),
+                )
+            ]
+        )
+        quality.setCurrentIndex(1)
+        height = QSpinBox()
+        height.setRange(0, 4320)
+        height.setSpecialValueText(self.t("Original", "Source"))
+        fps = self._combo(
+            [(self.t("Original", "Source"), None)]
+            + [(str(rate), Fraction(rate)) for rate in (24, 25, 30, 50, 60)]
+        )
+        form.addRow(self.t("Formato", "Format"), file_format)
+        form.addRow(self.t("Calidad H.264", "H.264 quality"), quality)
+        form.addRow(self.t("Altura máxima (px)", "Maximum height (px)"), height)
+        form.addRow(self.t("Cuadros por segundo", "Frames per second"), fps)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        extension = file_format.currentData()
+        source = Path(self.project.source)
+        default = source.with_name(f"{source.stem}-subtitulado.{extension}")
+        filename, _ = QFileDialog.getSaveFileName(
+            self, dialog.windowTitle(), str(default), f"*.{extension}"
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        if path.suffix.lower() != f".{extension}":
+            path = path.with_name(path.name + f".{extension}")
+        if self.project_path and path.resolve() == self.project_path.resolve():
+            self.show_error(
+                self.t(
+                    "Elige una ruta distinta del proyecto.", "Choose a path other than the project."
+                )
+            )
+            return
+        try:
+            overwrite = self.confirm_output(path)
+        except InterruptedError:
+            return
+        except (OSError, ValueError) as error:
+            self.show_error(error)
+            return
+        project = self.project
+        options = {
+            "quality": quality.currentData(),
+            "height_limit": height.value() or None,
+            "fps": fps.currentData(),
+            "overwrite": overwrite,
+        }
+        self.player.pause()
+        self.start_job(
+            lambda progress, cancelled: export_video(
+                project, path, **options, progress=progress, cancelled=cancelled
+            ),
+            lambda result: self.video_exported(path, result),
+        )
+
+    def video_exported(self, path, result):
+        audio = {
+            "copy": self.t("Audio AAC original", "Original AAC audio"),
+            "aac": self.t("Audio convertido a AAC", "Audio converted to AAC"),
+            "none": self.t("Sin pista de audio", "No audio track"),
+        }[result.audio_mode]
+        self.statusBar().showMessage(f"{result.width} × {result.height} · {audio} · {path}")
 
     def choose_prompt(self):
         options = [
