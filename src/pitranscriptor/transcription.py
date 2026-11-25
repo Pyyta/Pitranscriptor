@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from pitranscriptor.models import model_ready
 from pitranscriptor.project import Project
 from pitranscriptor.subtitles import MAX_MEDIA_MS, Word, fragment_words
 
@@ -46,6 +47,7 @@ def transcribe_project(
     language: str | None = "es",
     vocabulary: str | None = None,
     target: int = 4,
+    device: str = "cpu",
     progress: Callable[[int], None] = lambda percent: None,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> Project:
@@ -57,13 +59,16 @@ def transcribe_project(
 
     source = source.resolve(strict=True)
     duration, offset = inspect_media(source)
-    if not all(
-        (model_dir / name).is_file() for name in ("model.bin", "config.json", "tokenizer.json")
-    ):
+    if not model_ready(model_dir):
         raise ValueError("Selecciona una carpeta con un modelo CTranslate2 completo")
+    if device not in ("cpu", "cuda"):
+        raise ValueError("Dispositivo de reconocimiento inválido")
     progress(0)
     model = WhisperModel(
-        str(model_dir.resolve()), device="cpu", compute_type="int8", local_files_only=True
+        str(model_dir.resolve()),
+        device=device,
+        compute_type="int8" if device == "cpu" else "int8_float16",
+        local_files_only=True,
     )
     words = []
     last_end = 0

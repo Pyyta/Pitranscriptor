@@ -10,7 +10,7 @@ from fractions import Fraction
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QPointF, QRectF, QSettings, Qt, QThread, QUrl, Signal
+from PySide6.QtCore import QPointF, QRectF, QSettings, QStandardPaths, Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPen
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink
 from PySide6.QtWidgets import (
@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pitranscriptor.models import download_small, model_ready
 from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
 from pitranscriptor.subtitles import Cue, Style, Word, render_subtitles
@@ -257,6 +258,9 @@ class Editor(QMainWindow):
             file, self.t("Exportar WebVTT…", "Export WebVTT…"), lambda: self.export_text("vtt")
         )
         self._action(file, self.t("Exportar video…", "Export video…"), self.export_movie)
+        self._action(
+            file, self.t("Descargar modelo Small…", "Download Small model…"), self.install_model
+        )
         edit = self.menuBar().addMenu(self.t("Editar", "Edit"))
         self._action(edit, self.t("Deshacer", "Undo"), self.undo, QKeySequence.StandardKey.Undo)
         self._action(edit, self.t("Rehacer", "Redo"), self.redo, QKeySequence.StandardKey.Redo)
@@ -292,6 +296,8 @@ class Editor(QMainWindow):
         toolbar.addWidget(self._button(self.t("Modelo…", "Model…"), self.choose_model))
         self.language_mode = self._combo([("Español", "es"), ("English", "en"), ("Auto", None)])
         toolbar.addWidget(self.language_mode)
+        self.device = self._combo([("CPU", "cpu"), ("NVIDIA CUDA", "cuda")])
+        toolbar.addWidget(self.device)
         self.target = QSpinBox()
         self.target.setRange(1, 7)
         self.target.setValue(4)
@@ -309,7 +315,15 @@ class Editor(QMainWindow):
         toolbar.addWidget(self.progress)
         toolbar.addStretch()
         layout.addLayout(toolbar)
-        self.model_path = Path(self.settings.value("model", "models/faster-whisper-small"))
+        storage = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.AppLocalDataLocation
+        )
+        self.download_path = Path(storage) / "models" / "faster-whisper-small"
+        workspace_model = Path("models/faster-whisper-small")
+        default_model = (
+            workspace_model.resolve() if model_ready(workspace_model) else self.download_path
+        )
+        self.model_path = Path(self.settings.value("model", str(default_model)))
         self.prompt = None
 
         split = QSplitter()
@@ -643,6 +657,34 @@ class Editor(QMainWindow):
             self.settings.setValue("model", path)
             self.statusBar().showMessage(path)
 
+    def install_model(self):
+        if self.job is not None:
+            return
+        if model_ready(self.download_path):
+            self.use_model(self.download_path)
+            return
+        answer = QMessageBox.question(
+            self,
+            "Pitranscriptor",
+            self.t(
+                "¿Descargar el modelo multilingüe Small (aprox. 490 MB)?",
+                "Download the multilingual Small model (about 490 MB)?",
+            ),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.start_job(
+            lambda progress, cancelled: download_small(self.download_path),
+            self.use_model,
+            can_cancel=False,
+        )
+        self.progress.setRange(0, 0)
+
+    def use_model(self, path):
+        self.model_path = path
+        self.settings.setValue("model", str(path))
+        self.statusBar().showMessage(self.t("Modelo local disponible.", "Local model is ready."))
+
     def export_movie(self):
         if self.project is None or self.job is not None:
             return
@@ -750,6 +792,9 @@ class Editor(QMainWindow):
     def transcribe(self):
         if self.project is None or self.job is not None:
             return
+        if not model_ready(self.model_path):
+            self.install_model()
+            return
         if (
             self.project.cues
             and QMessageBox.question(
@@ -768,6 +813,7 @@ class Editor(QMainWindow):
         language = self.language_mode.currentData()
         model = self.model_path
         target = self.target.value()
+        device = self.device.currentData()
         prompt = self.prompt
         self.start_job(
             lambda progress, cancelled: transcribe_project(
@@ -775,6 +821,7 @@ class Editor(QMainWindow):
                 model,
                 language=language,
                 target=target,
+                device=device,
                 vocabulary=prompt,
                 progress=progress,
                 cancelled=cancelled,
@@ -782,14 +829,15 @@ class Editor(QMainWindow):
             lambda project: self.commit(project, 0),
         )
 
-    def start_job(self, operation, callback, *, waveform=False):
+    def start_job(self, operation, callback, *, waveform=False, can_cancel=True):
         self.job = Job(operation, self)
         self.job_callback = callback
         self.job_waveform = waveform
         self.job.progress.connect(self.progress.setValue)
         self.job.finished.connect(self.finish_job)
         self.transcribe_button.setEnabled(False)
-        self.cancel_button.setEnabled(not waveform)
+        self.cancel_button.setEnabled(not waveform and can_cancel)
+        self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.setVisible(not waveform)
         self.job.start()
@@ -1170,6 +1218,8 @@ def main(argv=None):
     parser.add_argument("--language", choices=("es", "en"))
     args = parser.parse_args(argv)
     app = QApplication([sys.argv[0]])
+    app.setOrganizationName("sudo_pita")
+    app.setApplicationName("Pitranscriptor")
     configure_application(app)
     settings = QSettings("sudo_pita", "Pitranscriptor")
     editor = Editor(args.language or settings.value("language", "es"))

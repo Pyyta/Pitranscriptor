@@ -94,3 +94,22 @@ Con las correcciones y la confirmación de revisión de las tres muestras adicio
 | Conjunto ponderado por palabras | 20 | 951 | 2,10 % |
 
 El conjunto se calcula sumando errores y palabras de referencia, no promediando porcentajes por archivo. Las tres referencias adicionales se originaron en borradores de este mismo motor y fueron revisadas/corregidas por el usuario; ese origen debe conservarse al interpretar los resultados. No equivalen a una transcripción independiente hecha desde cero. Esta línea base no valida otros modelos, voces, idiomas ni equipos y no convierte los errores corregidos en reglas automáticas del reconocedor.
+
+## Comparación de modelos en las cuatro referencias
+
+Se ejecutó `scripts/benchmark.py` con 322,716 s de audio y 951 palabras revisadas en Windows 11. Se mantuvo la misma configuración de reconocimiento de los ensayos anteriores. En la condición con pistas se pasó la lista completa de `docs/vocabulario.md`, igual para las cuatro muestras. La cobertura cuenta 20 pares de muestra y término de esa lista presentes en las referencias.
+
+| Modelo y dispositivo | Pistas | WER | CER | Términos | Inferencia total | Memoria RAM pico |
+| --- | --- | --- | --- | --- | --- | --- |
+| Small, CPU | No | 2,10 % | 0,46 % | 12/20 | 94,2 s | 693 MiB |
+| Small, CPU | Sí | 2,94 % | 1,00 % | 18/20 | 123,5 s | 692 MiB |
+| Medium, CPU | No | 8,10 % | 4,36 % | 12/20 | 238,3 s | 1740 MiB |
+| Medium, CPU | Sí | 5,47 % | 2,50 % | 19/20 | 323,3 s | 1740 MiB |
+| Large-v3-turbo, CPU | No | 5,15 % | 1,91 % | 14/20 | 158,8 s | 1878 MiB |
+| Large-v3-turbo, CPU | Sí | 5,47 % | 2,29 % | 18/20 | 151,9 s | 1878 MiB |
+| Small, RTX 3050 Laptop | No | 4,52 % | 1,73 % | 12/20 | 53,9 s | 931 MiB |
+| Large-v3-turbo, RTX 3050 Laptop | No | 5,57 % | 2,00 % | 12/20 | 54,5 s | 1980 MiB |
+
+CPU usa `int8_float32` con ocho hilos y CUDA usa `int8_float16`. Se midió la memoria residente del proceso. Los tiempos son observaciones de una ejecución por condición con carga variable del equipo. En estas cuatro muestras, la comprobación literal no detectó términos del vocabulario fuera de la referencia. Esa métrica solo cubre la lista y estas grabaciones. La RTX 3050 de 4 GiB completó ambos ensayos después de cargar cuBLAS 12 y cuDNN 9 en un entorno local. La ruta CPU sirve como configuración inicial y las pistas quedan como opción. Las tres referencias derivadas de Small favorecen su similitud con el texto revisado y hacen provisional esta elección.
+
+Revisiones probadas de [Medium](https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f) y [Large-v3-turbo](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf). Los archivos `comparison-*.json` quedan en `reports/local/`.
