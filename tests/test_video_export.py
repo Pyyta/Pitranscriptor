@@ -1,6 +1,7 @@
 import os
 from dataclasses import replace
 from fractions import Fraction
+from xml.sax.saxutils import unescape
 
 import pytest
 
@@ -92,3 +93,75 @@ def test_cancelled_export_leaves_no_output(tmp_path, qt_app):
     with pytest.raises(InterruptedError):
         export_video(Project(str(source), 1000), target, cancelled=lambda: True)
     assert list(tmp_path.iterdir()) == [source]
+
+
+@pytest.mark.parametrize("ext, codec", [("mkv", "srt"), ("mp4", "mov_text"), ("mov", "mov_text")])
+def test_selectable_track_preserves_video_audio_and_cue_times(tmp_path, ext, codec):
+    from pitranscriptor.video_export import export_subtitle_track
+
+    source = tmp_path / "source.mp4"
+    make_clip(source, 160, 96, audio_codec="aac")
+    original = source.read_bytes()
+    target = tmp_path / f"with-track.{ext}"
+    cues = (
+        Cue(30, 140, "¡Qué tal <Linux>!"),
+        Cue(140, 300, "A & B"),
+        Cue(455, 780, "Siguiente fragmento"),
+    )
+    project = Project(str(source), 1000, cues)
+    progress = []
+    result = export_subtitle_track(project, target, progress=progress.append)
+    assert (result.width, result.height, result.audio_mode) == (160, 96, "copy")
+    assert result.subtitle_codec == ("subrip" if codec == "srt" else "mov_text")
+    assert progress[-1] == 100 and progress == sorted(set(progress))
+    assert source.read_bytes() == original
+
+    with av.open(str(source)) as before, av.open(str(target)) as after:
+        for media in (before, after):
+            assert media.streams.video[0].codec_context.name == "h264"
+            assert media.streams.audio[0].codec_context.name == "aac"
+        original_packets = [bytes(packet) for packet in before.demux(video=0) if packet.size]
+        exported_packets = [bytes(packet) for packet in after.demux(video=0) if packet.size]
+        assert original_packets == exported_packets
+    with av.open(str(source)) as before, av.open(str(target)) as after:
+        original_packets = [bytes(packet) for packet in before.demux(audio=0) if packet.size]
+        exported_packets = [bytes(packet) for packet in after.demux(audio=0) if packet.size]
+        assert original_packets == exported_packets
+    with av.open(str(target)) as after:
+        (track,) = after.streams.subtitles
+        assert track.codec_context.name == codec
+        video = after.streams.video[0]
+        origin = video.start_time * video.time_base
+        packets = [packet for packet in after.demux(track) if packet.size > 2]
+        for packet, cue in zip(packets, cues, strict=True):
+            text = bytes(packet)
+            if codec == "mov_text":
+                length = int.from_bytes(text[:2], "big")
+                assert length == len(text) - 2
+                visible = text[2:].decode()
+            else:
+                visible = unescape(text.decode())
+            assert visible == cue.text
+            assert abs((packet.pts * packet.time_base - origin) * 1000 - cue.start_ms) <= 1
+            assert packet.duration * packet.time_base * 1000 == cue.end_ms - cue.start_ms
+
+
+def test_cancelled_selectable_export_preserves_existing_file(tmp_path):
+    from pitranscriptor.video_export import export_subtitle_track
+
+    source = tmp_path / "source.mp4"
+    make_clip(source, 160, 96, audio_codec="aac")
+    target = tmp_path / "export.mkv"
+    target.write_bytes(b"existing")
+    project = Project(str(source), 1000, (Cue(0, 1000, "Texto"),))
+    progress = []
+    with pytest.raises(InterruptedError):
+        export_subtitle_track(
+            project,
+            target,
+            overwrite=True,
+            progress=progress.append,
+            cancelled=lambda: bool(progress),
+        )
+    assert target.read_bytes() == b"existing"
+    assert set(tmp_path.iterdir()) == {source, target}

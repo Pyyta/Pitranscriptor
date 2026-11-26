@@ -88,7 +88,7 @@ from pitranscriptor.review import compare_readings
 from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import DEFAULT_RIGOR, inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
-from pitranscriptor.video_export import export_video
+from pitranscriptor.video_export import export_subtitle_track, export_video
 from pitranscriptor.vocabulary import suggest_script_terms
 from pitranscriptor.vocabulary_picker import VocabularyPicker
 from pitranscriptor.waveform import audio_peaks
@@ -952,7 +952,15 @@ class Editor(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle(self.t("Exportar video", "Export video"))
         form = QFormLayout(dialog)
-        file_format = self._combo([("MP4", "mp4"), ("MOV", "mov")])
+        subtitle_mode = self._combo(
+            [
+                (self.t("Pista seleccionable", "Selectable track"), "track"),
+                (self.t("Renderizados sobre el video", "Burned into the video"), "burn"),
+            ]
+        )
+        file_format = QComboBox()
+        format_info = QLabel()
+        format_info.setWordWrap(True)
         quality = self._combo(
             [
                 (self.t(es, en), code)
@@ -972,10 +980,36 @@ class Editor(QMainWindow):
             [(self.t("Original", "Source"), None)]
             + [(str(rate), Fraction(rate)) for rate in (24, 25, 30, 50, 60)]
         )
+        form.addRow(self.t("Subtítulos", "Subtitles"), subtitle_mode)
         form.addRow(self.t("Formato", "Format"), file_format)
+        form.addRow(format_info)
         form.addRow(self.t("Calidad H.264", "H.264 quality"), quality)
         form.addRow(self.t("Altura máxima (px)", "Maximum height (px)"), height)
         form.addRow(self.t("Cuadros por segundo", "Frames per second"), fps)
+
+        def update_format_info():
+            if subtitle_mode.currentData() == "burn":
+                info = self.t("Se incluyen los estilos del editor.", "Editor styles are included.")
+            else:
+                codec = "SRT" if file_format.currentData() == "mkv" else "mov_text"
+                info = self.t(
+                    f"Pista {codec} con texto y tiempos. Se copian el video y el audio.",
+                    f"{codec} track with text and timings. Video and audio are copied.",
+                )
+            format_info.setText(info)
+
+        def update_formats():
+            track = subtitle_mode.currentData() == "track"
+            file_format.clear()
+            for extension in ("mkv", "mp4", "mov") if track else ("mp4", "mov"):
+                file_format.addItem(extension.upper(), extension)
+            for field in (quality, height, fps):
+                form.setRowVisible(field, not track)
+            update_format_info()
+
+        subtitle_mode.currentIndexChanged.connect(update_formats)
+        file_format.currentIndexChanged.connect(update_format_info)
+        update_formats()
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
@@ -1010,15 +1044,18 @@ class Editor(QMainWindow):
             self.show_error(error)
             return
         project = self.project
-        options = {
-            "quality": quality.currentData(),
-            "height_limit": height.value() or None,
-            "fps": fps.currentData(),
-            "overwrite": overwrite,
-        }
+        options = {"overwrite": overwrite}
+        export = export_subtitle_track
+        if subtitle_mode.currentData() == "burn":
+            export = export_video
+            options.update(
+                quality=quality.currentData(),
+                height_limit=height.value() or None,
+                fps=fps.currentData(),
+            )
         self.player.pause()
         self.start_job(
-            lambda progress, cancelled: export_video(
+            lambda progress, cancelled: export(
                 project, path, **options, progress=progress, cancelled=cancelled
             ),
             lambda result: self.video_exported(path, result),
@@ -1026,11 +1063,18 @@ class Editor(QMainWindow):
 
     def video_exported(self, path, result):
         audio = {
-            "copy": self.t("Audio AAC original", "Original AAC audio"),
+            "copy": self.t("Audio original", "Original audio"),
             "aac": self.t("Audio convertido a AAC", "Audio converted to AAC"),
             "none": self.t("Sin pista de audio", "No audio track"),
         }[result.audio_mode]
-        self.statusBar().showMessage(f"{result.width} × {result.height} · {audio} · {path}")
+        if result.subtitle_codec:
+            codec = "SRT" if result.subtitle_codec == "subrip" else "mov_text"
+            subtitles = self.t(f"Pista {codec}", f"{codec} track")
+        else:
+            subtitles = self.t("Subtítulos renderizados", "Burned-in subtitles")
+        self.statusBar().showMessage(
+            f"{result.width} × {result.height} · {audio} · {subtitles} · {path}"
+        )
 
     def choose_prompt(self):
         options = [

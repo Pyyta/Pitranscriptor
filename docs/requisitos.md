@@ -31,9 +31,9 @@
 
 ## Exportación
 
-- Video con subtítulos integrados, preferiblemente MP4 y MOV, y archivos SRT y VTT independientes. SRT/VTT no garantizan reproducir estilos complejos ni animaciones como en el video.
+- Por defecto, pista de subtítulos seleccionable en MKV (SRT), con MP4 y MOV (`mov_text`) como opciones. Conservar texto y tiempos y copiar video y audio si el contenedor lo admite. Ofrecer subtítulos renderizados en MP4/MOV para conservar los estilos de la vista previa y exportación independiente a SRT/VTT.
 - Calidad original/alta/media/baja y ajustes manuales de resolución y cuadros por segundo; nunca ampliar por encima de la resolución de entrada. Mantener dimensiones, orientación y cuadros por segundo de origen por defecto cuando sea posible.
-- Conservar el audio original cuando el contenedor y códec lo permitan; si no, informar y recodificar. Integrar subtítulos exige recodificar el video y puede afectar la calidad incluso a resolución original.
+- Conservar el audio original cuando el contenedor y códec lo permitan. En modo renderizado, informar cuando se convierta el audio. Si el modo de pista no admite un códec original, informar y permitir elegir otro contenedor. Renderizar subtítulos sobre la imagen exige recodificar el video.
 - Elegir nombre y carpeta; avisar antes de sobrescribir. No se necesita exportación parcial.
 
 ## Decisiones aún abiertas

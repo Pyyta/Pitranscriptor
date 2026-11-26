@@ -1,4 +1,4 @@
-"""Exportar video con la misma composición de subtítulos de la vista previa."""
+"""Exportar subtítulos seleccionables o renderizados sobre el video."""
 
 import os
 from bisect import bisect_right
@@ -7,11 +7,14 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from xml.sax.saxutils import escape
 
 from pitranscriptor.project import Project
 
 QUALITY = {"original": 16, "high": 19, "medium": 23, "low": 28}
 VIDEO_TIME_BASE = Fraction(1, 90_000)
+SUBTITLE_TIME_BASE = Fraction(1, 1_000)
+SUBTITLE_CODECS = {".mkv": "subrip", ".mp4": "mov_text", ".mov": "mov_text"}
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,114 @@ class ExportResult:
     width: int
     height: int
     audio_mode: str
+    subtitle_codec: str | None = None
+
+
+def export_subtitle_track(
+    project: Project,
+    destination: Path,
+    *,
+    overwrite: bool = False,
+    progress: Callable[[int], None] = lambda percent: None,
+    cancelled: Callable[[], bool] = lambda: False,
+) -> ExportResult:
+    """Multiplexar subtítulos de texto y copiar los paquetes de video y audio."""
+    import av
+
+    source = Path(project.source).resolve(strict=True)
+    destination = destination.resolve()
+    suffix = destination.suffix.lower()
+    if destination == source or suffix not in SUBTITLE_CODECS:
+        raise ValueError("Selecciona un archivo MKV, MP4 o MOV diferente del original")
+    if destination.exists() and not overwrite:
+        raise FileExistsError(destination)
+    if cancelled():
+        raise InterruptedError("Exportación cancelada")
+    if not project.cues:
+        raise ValueError("Añade al menos un fragmento para exportar una pista de subtítulos")
+
+    codec = SUBTITLE_CODECS[suffix]
+    options = {"default_mode": "passthrough"} if suffix == ".mkv" else None
+    with NamedTemporaryFile(dir=destination.parent, suffix=suffix, delete=False) as temporary:
+        temp_path = Path(temporary.name)
+    try:
+        with (
+            source.open("rb") as media,
+            av.open(media) as incoming,
+            av.open(str(temp_path), "w", options=options) as output,
+        ):
+            if not incoming.streams.video:
+                raise ValueError("El proyecto requiere un medio con video")
+            video = incoming.streams.video[0]
+            origin = (video.start_time or 0) * video.time_base
+            streams = (*incoming.streams.video, *incoming.streams.audio)
+            copies = {stream.index: output.add_stream_from_template(stream) for stream in streams}
+            output.metadata.update(incoming.metadata)
+            subtitle = output.add_mux_stream(codec, time_base=SUBTITLE_TIME_BASE)
+            subtitle.metadata["title"] = "Pitranscriptor"
+            subtitle.metadata["handler_name"] = "Pitranscriptor"
+            output.start_encoding()
+
+            cues = iter(project.cues)
+            cue = next(cues, None)
+            base_ms = round(origin / SUBTITLE_TIME_BASE)
+
+            def write_subtitle(cue):
+                text = " ".join(cue.text.split())
+                payload = (escape(text) if codec == "subrip" else text).encode("utf-8")
+                if codec == "mov_text":
+                    # Cada muestra tx3g empieza por el tamaño del texto UTF-8 en 16 bits.
+                    if len(payload) > 65535:
+                        raise ValueError("Un subtítulo supera el tamaño admitido en MP4 y MOV")
+                    payload = len(payload).to_bytes(2, "big") + payload
+                packet = av.Packet(payload)
+                packet.pts = packet.dts = base_ms + cue.start_ms
+                packet.duration = cue.end_ms - cue.start_ms
+                packet.time_base = SUBTITLE_TIME_BASE
+                packet.stream = subtitle
+                output.mux(packet)
+
+            last_progress = -1
+            for packet in incoming.demux(*streams):
+                if cancelled():
+                    raise InterruptedError("Exportación cancelada")
+                if packet.dts is None:
+                    continue
+                time = packet.dts * packet.time_base - origin
+                while cue is not None and cue.start_ms * SUBTITLE_TIME_BASE <= time:
+                    write_subtitle(cue)
+                    cue = next(cues, None)
+                packet.stream = copies[packet.stream.index]
+                output.mux(packet)
+                percent = min(99, int(time * 100_000 / project.duration_ms))
+                if percent > last_progress:
+                    last_progress = percent
+                    progress(percent)
+            while cue is not None:
+                if cancelled():
+                    raise InterruptedError("Exportación cancelada")
+                write_subtitle(cue)
+                cue = next(cues, None)
+            result = ExportResult(
+                video.width, video.height, "copy" if incoming.streams.audio else "none", codec
+            )
+
+        if cancelled():
+            raise InterruptedError("Exportación cancelada")
+        if overwrite:
+            os.replace(temp_path, destination)
+        else:
+            os.link(temp_path, destination)
+        progress(100)
+        return result
+    except av.FFmpegError as error:
+        if suffix in {".mp4", ".mov"}:
+            raise ValueError(
+                "No se pudieron copiar las pistas originales a este contenedor. Prueba MKV."
+            ) from error
+        raise ValueError("No se pudo exportar las pistas originales a MKV") from error
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def export_video(
