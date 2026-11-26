@@ -1,6 +1,6 @@
 # Vocabulario inicial
 
-Lista inicial proporcionada por sudo_pita para evaluar reconocimiento y orientar la transcripción cuando el motor lo admita. No aplicar reemplazos automáticos ciegos.
+Lista inicial proporcionada por sudo_pita para los ensayos de reconocimiento. El [catálogo integrado](../src/pitranscriptor/technical_vocabulary.json) conserva estos 58 términos e incorpora 3067 adicionales. En el editor, **Pistas… → Vocabulario técnico…** permite buscar por texto o categoría y activar hasta 20 términos a la vez. El editor recuerda esa selección para las próximas transcripciones.
 
 Kernel
 Omarchy

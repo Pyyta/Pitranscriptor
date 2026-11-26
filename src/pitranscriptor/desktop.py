@@ -72,6 +72,7 @@ from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
 from pitranscriptor.video_export import export_video
+from pitranscriptor.vocabulary_picker import VocabularyPicker
 from pitranscriptor.waveform import audio_peaks
 
 FILLERS = {"eh", "em", "mmm", "hmm", "uh", "um", "eee"}
@@ -432,7 +433,8 @@ class Editor(QMainWindow):
         self.target.setValue(4)
         self.target.setPrefix(self.t("Objetivo ", "Target "))
         toolbar.addWidget(self.target)
-        toolbar.addWidget(self._button(self.t("Pistas…", "Hints…"), self.choose_prompt))
+        self.hints_button = self._button(self.t("Pistas…", "Hints…"), self.choose_prompt)
+        toolbar.addWidget(self.hints_button)
         self.transcribe_button = self._button(self.t("Transcribir", "Transcribe"), self.transcribe)
         self.transcribe_button.setObjectName("primary")
         toolbar.addWidget(self.transcribe_button)
@@ -455,6 +457,8 @@ class Editor(QMainWindow):
         )
         self.model_path = Path(self.settings.value("model", str(default_model)))
         self.prompt = None
+        self.technical_terms = tuple(self.settings.value("technicalTerms", [], type=list))
+        self.update_hints_button()
 
         split = QSplitter()
         layout.addWidget(split, 1)
@@ -950,20 +954,43 @@ class Editor(QMainWindow):
     def choose_prompt(self):
         options = [
             self.t("Sin pistas", "No hints"),
+            self.t("Vocabulario técnico…", "Technical vocabulary…"),
             self.t("Cargar archivo de texto", "Load a text file"),
         ]
         choice, ok = QInputDialog.getItem(
-            self, "Pitranscriptor", self.t("Pistas del modelo", "Model hints"), options, 0, False
+            self, "Pitranscriptor", self.t("Pistas del modelo", "Model hints"), options, 1, False
         )
         if ok and choice == options[0]:
-            self.prompt = None
+            self.set_hints()
+        elif ok and choice == options[1]:
+            dialog = VocabularyPicker(self, self.t, self.technical_terms)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.set_hints(terms=dialog.selected_terms())
         elif ok:
-            path, _ = QFileDialog.getOpenFileName(self, options[1], "", "Text (*.txt *.md)")
+            path, _ = QFileDialog.getOpenFileName(self, options[2], "", "Text (*.txt *.md)")
             if path:
                 try:
-                    self.prompt = Path(path).read_text(encoding="utf-8-sig")
+                    self.set_hints(prompt=Path(path).read_text(encoding="utf-8-sig"))
                 except (OSError, ValueError) as error:
                     self.show_error(error)
+
+    def set_hints(self, *, terms=(), prompt=None):
+        self.technical_terms = terms
+        self.prompt = prompt
+        self.settings.setValue("technicalTerms", list(terms))
+        self.update_hints_button()
+
+    def update_hints_button(self):
+        count = len(self.technical_terms)
+        self.hints_button.setText(
+            self.t(f"Pistas ({count})…", f"Hints ({count})…")
+            if count
+            else self.t("Pistas…", "Hints…")
+        )
+        self.hints_button.setToolTip(
+            ", ".join(self.technical_terms)
+            or (self.t("Pistas de archivo", "Hints from file") if self.prompt else "")
+        )
 
     def transcribe(self):
         if self.project is None or self.job is not None:
@@ -991,6 +1018,7 @@ class Editor(QMainWindow):
         target = self.target.value()
         device = self.device.currentData()
         prompt = self.prompt
+        terms = self.technical_terms
         self.start_job(
             lambda progress, cancelled: run_transcription(
                 path,
@@ -999,6 +1027,7 @@ class Editor(QMainWindow):
                 target=target,
                 device=device,
                 vocabulary=prompt,
+                technical_terms=terms,
                 progress=progress,
                 cancelled=cancelled,
             ),
@@ -1574,6 +1603,10 @@ def main(argv=None):
         import ctranslate2
         import faster_whisper.audio
 
+        from pitranscriptor.vocabulary import technical_groups
+
+        if not technical_groups():
+            return 1
         if not ctranslate2.get_supported_compute_types("cpu"):
             return 1
         av.Codec("libx264", "w")

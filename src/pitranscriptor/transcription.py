@@ -1,6 +1,6 @@
 """Reconocimiento con un modelo ya instalado y marcas por palabra."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from math import isfinite
 from pathlib import Path
 
@@ -8,6 +8,7 @@ from pitranscriptor.cuda_runtime import prepare_cuda
 from pitranscriptor.models import model_ready
 from pitranscriptor.project import Project
 from pitranscriptor.subtitles import MAX_MEDIA_MS, Word, fragment_words
+from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS
 
 
 def inspect_media(source: Path, *, require_video: bool = False) -> tuple[int, int]:
@@ -60,6 +61,7 @@ def transcribe_project(
     *,
     language: str | None = "es",
     vocabulary: str | None = None,
+    technical_terms: Sequence[str] = (),
     target: int = 4,
     device: str = "cpu",
     progress: Callable[[int], None] = lambda percent: None,
@@ -81,6 +83,8 @@ def transcribe_project(
         raise ValueError("Dispositivo de reconocimiento inválido")
     if cancelled():
         raise InterruptedError("Transcripción cancelada")
+    if len(technical_terms) > MAX_TECHNICAL_HINTS:
+        raise ValueError(f"Elige hasta {MAX_TECHNICAL_HINTS} pistas del vocabulario técnico")
     progress(0)
     if device == "cuda":
         prepare_cuda()
@@ -92,6 +96,13 @@ def transcribe_project(
     )
     if cancelled():
         raise InterruptedError("Transcripción cancelada")
+    hotwords = ", ".join(technical_terms) or None
+    if hotwords:
+        tokens = model.hf_tokenizer.encode(f" {hotwords}", add_special_tokens=False).ids
+        if len(tokens) >= model.max_length // 2:
+            raise ValueError(
+                "Las pistas exceden el contexto del modelo. Selecciona menos términos."
+            )
     words = []
     last_end = 0
     try:
@@ -129,6 +140,7 @@ def transcribe_project(
                 temperature=0,
                 condition_on_previous_text=False,
                 initial_prompt=vocabulary,
+                hotwords=hotwords,
             )
             for segment in segments:
                 if cancelled():

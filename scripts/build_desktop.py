@@ -86,6 +86,8 @@ def main() -> None:
         "--hidden-import",
         "PySide6.QtMultimedia",
         "--add-data",
+        f"{ROOT / 'src/pitranscriptor/technical_vocabulary.json'}:pitranscriptor",
+        "--add-data",
         f"{ROOT / 'LICENSE'}:.",
         "--add-data",
         f"{ROOT / 'NOTICE'}:.",
