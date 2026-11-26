@@ -65,6 +65,7 @@ def transcribe_project(
     language: str | None = "es",
     vocabulary: str | None = None,
     technical_terms: Sequence[str] = (),
+    context_hint: str | None = None,
     target: int = 4,
     device: str = "cpu",
     rigor: str = DEFAULT_RIGOR,
@@ -102,12 +103,15 @@ def transcribe_project(
     )
     if cancelled():
         raise InterruptedError("Transcripción cancelada")
-    hotwords = ", ".join(technical_terms) or None
+    context = " ".join(context_hint.split()) if context_hint else ""
+    terms = ", ".join(technical_terms)
+    hotwords = "\n".join(part for part in (context, terms) if part) or None
     if hotwords:
         tokens = model.hf_tokenizer.encode(f" {hotwords}", add_special_tokens=False).ids
         if len(tokens) >= model.max_length // 2:
             raise ValueError(
-                "Las pistas exceden el contexto del modelo. Selecciona menos términos."
+                "Las pistas exceden el contexto del modelo. "
+                "Acorta el contexto o elige menos términos."
             )
     words = []
     last_end = 0

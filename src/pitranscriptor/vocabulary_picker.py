@@ -17,10 +17,11 @@ from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS, technical_groups
 
 
 class VocabularyPicker(QDialog):
-    def __init__(self, parent, translate, selected):
+    def __init__(self, parent, translate, selected, *, suggested=()):
         super().__init__(parent)
         self.t = translate
         self.groups = technical_groups()
+        self.suggested = suggested
         self.setWindowTitle(self.t("Vocabulario técnico", "Technical vocabulary"))
         self.resize(730, 480)
 
@@ -32,6 +33,8 @@ class VocabularyPicker(QDialog):
         filters.addWidget(self.search, 1)
         self.category = QComboBox()
         self.category.setAccessibleName(self.t("Categoría", "Category"))
+        if suggested:
+            self.category.addItem(self.t("Términos del guion", "Script terms"), "script")
         self.category.addItem(self.t("Todas las categorías", "All categories"))
         for group in self.groups:
             self.category.addItem(self.t(group.es, group.en), group.id)
@@ -111,18 +114,24 @@ class VocabularyPicker(QDialog):
         category = self.category.currentData()
         search = self.search.text().strip().casefold()
         selected = {term.casefold() for term in self.selected_terms()}
+        candidates = (
+            self.suggested
+            if category == "script"
+            else (
+                term
+                for group in self.groups
+                if category is None or category == group.id
+                for term in group.terms
+            )
+        )
+        matches = [
+            term
+            for term in candidates
+            if term.casefold() not in selected and search in term.casefold()
+        ]
         self.available.clear()
         self.available.addItems(
-            sorted(
-                (
-                    term
-                    for group in self.groups
-                    if category is None or category == group.id
-                    for term in group.terms
-                    if term.casefold() not in selected and search in term.casefold()
-                ),
-                key=str.casefold,
-            )
+            matches if category == "script" else sorted(matches, key=str.casefold)
         )
         self.update_buttons()
 

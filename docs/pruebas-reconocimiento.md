@@ -140,3 +140,16 @@ Se comparó un pasaje de una grabación propia que contiene «solito» y «Zyppe
 Con Small y CUDA también se probaron una búsqueda más amplia, temperatura con reintentos, contexto del segmento anterior y otros parámetros del detector de voz. Ninguno recuperó más palabras objetivo que la pista breve con la configuración habitual. Una frase técnica larga usada como pista recuperó `Zypper` pero perdió `solito` en ese pasaje.
 
 Se procesaron además 15 frases sintéticas locales, con tres voces de Windows y 228 palabras de referencia. Small en CPU recuperó las nueve apariciones de `solito` tanto sin pistas como con pistas. En el mismo ensayo recuperó 0/9 apariciones de `Zypper` sin pistas y 7/9 con listas breves que incluían `Zypper`. Esas listas también generaron dos apariciones fuera de los pasajes esperados, donde se dijo «zíper». Los ejemplos sintéticos sirven para comprobar funcionamiento y sesgo. Hace falta audio natural adicional con referencias independientes para evaluar una mejora general.
+
+## Comparación con el guion de openSUSE
+
+Se comparó una grabación de 75,4 s con un guion facilitado por el autor. La referencia de 285 palabras unifica la separación tipográfica de Tumbleweed y omite acotaciones de risa. Se ignoran puntuación y mayúsculas y se conservan los acentos. El resultado mide diferencias de texto frente al guion. Algunas pueden corresponder a lo dicho durante la grabación y las cifras no estiman por sí solas la tasa real de errores del audio.
+
+| Configuración equilibrada | Diferencias | Términos comprobados |
+| --- | --- | --- |
+| Small, CPU, sin pistas | 39/285 | 2/11 |
+| Turbo, CUDA, sin pistas | 15/285 | 8/11 |
+| Turbo, CUDA, lista técnica breve | 9/285 | 9/11 |
+| Turbo, CUDA, frases breves de contexto | 7/285 | 11/11 |
+
+Las frases se eligieron a partir del tema del guion y orientan la decodificación de cada tramo mediante `hotwords` de faster-whisper. La comparación conserva el mismo modelo Turbo, dispositivo e idioma entre las tres condiciones de CUDA. La aplicación conserva los pesos y el valor predeterminado. La opción contextual se activa por video. Las hipótesis completas, el guion y el proyecto de prueba quedan en `reports/local/`.

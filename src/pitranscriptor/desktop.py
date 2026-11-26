@@ -88,6 +88,7 @@ from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import DEFAULT_RIGOR, inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
 from pitranscriptor.video_export import export_video
+from pitranscriptor.vocabulary import suggest_script_terms
 from pitranscriptor.vocabulary_picker import VocabularyPicker
 from pitranscriptor.waveform import audio_peaks
 
@@ -505,6 +506,7 @@ class Editor(QMainWindow):
         self.model_path = Path(self.settings.value("model", str(default_model)))
         self.model_button.setToolTip(str(self.model_path))
         self.prompt = None
+        self.context_hint = ""
         self.technical_terms = tuple(self.settings.value("technicalTerms", [], type=list))
         self.update_hints_button()
 
@@ -809,6 +811,9 @@ class Editor(QMainWindow):
         self.player.stop()
         self.preview.frame = QImage()
         self.preview.position = 0
+        if self.project and self.project.source != project.source:
+            self.context_hint = ""
+            self.update_hints_button()
         self.project = project
         self.saved_project = project
         self.project_path = path
@@ -1025,32 +1030,71 @@ class Editor(QMainWindow):
         options = [
             self.t("Sin pistas", "No hints"),
             self.t("Vocabulario técnico…", "Technical vocabulary…"),
+            self.t("Términos de un guion…", "Terms from a script…"),
+            self.t("Contexto breve…", "Short context…"),
             self.t("Cargar archivo de texto", "Load a text file"),
         ]
         choice, ok = QInputDialog.getItem(
             self, "Pitranscriptor", self.t("Pistas del modelo", "Model hints"), options, 1, False
         )
-        if ok and choice == options[0]:
+        if not ok:
+            return
+        if choice == options[0]:
             self.set_hints()
-        elif ok and choice == options[1]:
-            dialog = VocabularyPicker(self, self.t, self.technical_terms)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                self.set_hints(terms=dialog.selected_terms())
-        elif ok:
-            path, _ = QFileDialog.getOpenFileName(self, options[2], "", "Text (*.txt *.md)")
+        elif choice == options[1]:
+            self.pick_vocabulary()
+        elif choice == options[2]:
+            script, accepted = QInputDialog.getMultiLineText(
+                self, options[2], self.t("Pega el guion de este video", "Paste this video's script")
+            )
+            if accepted and script.strip():
+                suggested = suggest_script_terms(script)
+                if not suggested:
+                    self.statusBar().showMessage(
+                        self.t(
+                            "No encontré términos del catálogo en el guion.",
+                            "No catalog terms found in the script.",
+                        )
+                    )
+                self.pick_vocabulary(suggested=suggested)
+        elif choice == options[3]:
+            context, accepted = QInputDialog.getMultiLineText(
+                self,
+                options[3],
+                self.t(
+                    "Escribe unas frases con el tema y las palabras difíciles del audio.",
+                    "Enter a few phrases with the topic and difficult words in the audio.",
+                ),
+                self.context_hint,
+            )
+            if accepted:
+                self.context_hint = context.strip()
+                self.update_hints_button()
+        else:
+            path, _ = QFileDialog.getOpenFileName(self, options[4], "", "Text (*.txt *.md)")
             if path:
                 try:
                     self.set_hints(prompt=Path(path).read_text(encoding="utf-8-sig"))
                 except (OSError, ValueError) as error:
                     self.show_error(error)
 
+    def pick_vocabulary(self, *, suggested=()):
+        dialog = VocabularyPicker(self, self.t, self.technical_terms, suggested=suggested)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.set_hints(terms=dialog.selected_terms())
+
     def set_hints(self, *, terms=(), prompt=None):
         self.technical_terms = terms
         self.prompt = prompt
+        self.context_hint = ""
         self.settings.setValue("technicalTerms", list(terms))
         self.update_hints_button()
 
     def update_hints_button(self):
+        if self.context_hint:
+            self.hints_button.setText(self.t("Contexto…", "Context…"))
+            self.hints_button.setToolTip(self.context_hint)
+            return
         count = len(self.technical_terms)
         self.hints_button.setText(
             self.t(f"Pistas ({count})…", f"Hints ({count})…")
@@ -1088,8 +1132,9 @@ class Editor(QMainWindow):
         target = self.target.value()
         device = self.device.currentData()
         rigor = self.rigor.currentData()
-        prompt = self.prompt
-        terms = self.technical_terms
+        context = self.context_hint or None
+        prompt = None if context else self.prompt
+        terms = () if context else self.technical_terms
         self.start_job(
             lambda progress, cancelled: run_transcription(
                 path,
@@ -1100,6 +1145,7 @@ class Editor(QMainWindow):
                 rigor=rigor,
                 vocabulary=prompt,
                 technical_terms=terms,
+                context_hint=context,
                 progress=progress,
                 cancelled=cancelled,
             ),

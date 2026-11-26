@@ -7,7 +7,7 @@ import pytest
 from pitranscriptor.models import MODEL_FILES, SMALL_MODEL, TURBO_MODEL
 from pitranscriptor.project import Project
 from pitranscriptor.subtitles import Cue, Style, Word
-from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS
+from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS, suggest_script_terms
 
 desktop = pytest.importorskip("pitranscriptor.desktop")
 qt_core = pytest.importorskip("PySide6.QtCore")
@@ -215,6 +215,22 @@ def test_custom_hint_uses_same_list_and_limit_as_catalog(qt_app):
     picker.custom.setText("Una más")
     picker.custom.returnPressed.emit()
     assert len(picker.selected_terms()) == MAX_TECHNICAL_HINTS
+    picker.deleteLater()
+    qt_app.sendPostedEvents(None, qt_core.QEvent.Type.DeferredDelete)
+
+
+def test_script_hints_preserve_order_require_selection_and_skip_short_prose(qt_app):
+    title = "Vi dos opciones. Zypper y YaST en OpenSuse Leap. Un package\nmanager; luego Zypper."
+    terms = suggest_script_terms(title)
+    assert terms == ("Zypper", "YaST", "openSUSE", "Leap", "package manager")
+    picker = desktop.VocabularyPicker(None, lambda es, en: es, ("YaST",), suggested=terms)
+    assert picker.category.currentText() == "Términos del guion"
+    assert picker.available.item(0).text() == "Zypper"
+    assert picker.available.count() == 4
+    assert picker.selected_terms() == ("YaST",)
+    picker.available.item(0).setSelected(True)
+    picker.add_button.click()
+    assert picker.selected_terms() == ("YaST", "Zypper")
     picker.deleteLater()
     qt_app.sendPostedEvents(None, qt_core.QEvent.Type.DeferredDelete)
 
