@@ -11,7 +11,7 @@ from pitranscriptor.corpus import validate_corpus
 from pitranscriptor.diagnostics import environment_report
 from pitranscriptor.project import load_project, save_project, write_text
 from pitranscriptor.subtitles import render_subtitles
-from pitranscriptor.transcription import transcribe_project
+from pitranscriptor.transcription import DEFAULT_RIGOR, RIGOR_BEAMS, transcribe_project
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     transcribe.add_argument("--prompt", type=Path, help="Archivo UTF-8 con pistas opcionales")
     transcribe.add_argument("--target", type=int, choices=range(1, 8), default=4)
     transcribe.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    transcribe.add_argument("--rigor", choices=RIGOR_BEAMS, default=DEFAULT_RIGOR)
     export = commands.add_parser("export-subtitles", help="Exportar el texto de un proyecto")
     export.add_argument("project", type=Path)
     export.add_argument("destination", type=Path)
@@ -54,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
                     vocabulary=args.prompt.read_text(encoding="utf-8") if args.prompt else None,
                     target=args.target,
                     device=args.device,
+                    rigor=args.rigor,
                 )
                 save_project(args.destination, project)
                 print(f"Proyecto creado con {len(project.cues)} fragmentos")

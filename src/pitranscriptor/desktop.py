@@ -76,7 +76,7 @@ from pitranscriptor.retro_theme import (
     retro_palette,
 )
 from pitranscriptor.subtitles import Cue, Style, render_subtitles
-from pitranscriptor.transcription import inspect_media
+from pitranscriptor.transcription import DEFAULT_RIGOR, inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
 from pitranscriptor.video_export import export_video
 from pitranscriptor.vocabulary_picker import VocabularyPicker
@@ -440,6 +440,30 @@ class Editor(QMainWindow):
         toolbar.addWidget(self.language_mode)
         self.device = self._combo([("CPU", "cpu"), ("NVIDIA CUDA", "cuda")])
         toolbar.addWidget(self.device)
+        self.rigor = self._combo(
+            [
+                (self.t("Rápido", "Fast"), "fast"),
+                (self.t("Equilibrado", "Balanced"), DEFAULT_RIGOR),
+                (self.t("Minucioso", "Thorough"), "thorough"),
+            ]
+        )
+        preferred = self.rigor.findData(self.settings.value("rigor", DEFAULT_RIGOR))
+        self.rigor.setCurrentIndex(
+            preferred if preferred >= 0 else self.rigor.findData(DEFAULT_RIGOR)
+        )
+        self.rigor.currentIndexChanged.connect(
+            lambda: self.settings.setValue("rigor", self.rigor.currentData())
+        )
+        self.rigor.setToolTip(
+            self.t(
+                "Un mayor rigor explora más alternativas de transcripción y puede tardar más.",
+                "Higher rigor explores more transcription alternatives and can take longer.",
+            )
+        )
+        rigor_label = QLabel(self.t("Rigor", "Rigor"))
+        rigor_label.setBuddy(self.rigor)
+        toolbar.addWidget(rigor_label)
+        toolbar.addWidget(self.rigor)
         self.target = QSpinBox()
         self.target.setRange(1, 7)
         self.target.setValue(4)
@@ -1035,6 +1059,7 @@ class Editor(QMainWindow):
         model = self.model_path
         target = self.target.value()
         device = self.device.currentData()
+        rigor = self.rigor.currentData()
         prompt = self.prompt
         terms = self.technical_terms
         self.start_job(
@@ -1044,6 +1069,7 @@ class Editor(QMainWindow):
                 language=language,
                 target=target,
                 device=device,
+                rigor=rigor,
                 vocabulary=prompt,
                 technical_terms=terms,
                 progress=progress,

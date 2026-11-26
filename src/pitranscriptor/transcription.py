@@ -10,6 +10,9 @@ from pitranscriptor.project import Project
 from pitranscriptor.subtitles import MAX_MEDIA_MS, Word, fragment_words
 from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS
 
+DEFAULT_RIGOR = "balanced"
+RIGOR_BEAMS = {"fast": 1, DEFAULT_RIGOR: 5, "thorough": 10}
+
 
 def inspect_media(source: Path, *, require_video: bool = False) -> tuple[int, int]:
     """Devuelve duración en ms y desfase inicial del audio respecto al video."""
@@ -64,9 +67,12 @@ def transcribe_project(
     technical_terms: Sequence[str] = (),
     target: int = 4,
     device: str = "cpu",
+    rigor: str = DEFAULT_RIGOR,
     progress: Callable[[int], None] = lambda percent: None,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> Project:
+    if rigor not in RIGOR_BEAMS:
+        raise ValueError("Nivel de rigor de transcripción inválido")
     try:
         import av
         from faster_whisper import WhisperModel
@@ -136,7 +142,7 @@ def transcribe_project(
                 multilingual=mixed,
                 vad_filter=not mixed,
                 clip_timestamps=clips,
-                beam_size=5,
+                beam_size=RIGOR_BEAMS[rigor],
                 temperature=0,
                 condition_on_previous_text=False,
                 initial_prompt=vocabulary,
