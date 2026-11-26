@@ -1,6 +1,6 @@
 # Vocabulario inicial
 
-Lista inicial proporcionada por sudo_pita para los ensayos de reconocimiento. El [catálogo integrado](../src/pitranscriptor/technical_vocabulary.json) conserva estos 58 términos e incorpora 3067 adicionales. En el editor, **Pistas… → Vocabulario técnico…** permite buscar por texto o categoría y activar hasta 20 términos a la vez. El editor recuerda esa selección para las próximas transcripciones.
+Lista inicial proporcionada por sudo_pita para los ensayos de reconocimiento. El [catálogo integrado](../src/pitranscriptor/technical_vocabulary.json) conserva estos 58 términos e incorpora 3067 adicionales. En el editor, **Pistas… → Vocabulario técnico…** permite buscar por texto o categoría. **Pista propia** acepta una palabra o frase ausente del catálogo. El modelo recibe hasta 20 pistas activas por transcripción y el editor recuerda la selección. Conviene activar las que se esperan oír en el audio, porque pueden sesgar el reconocimiento de palabras parecidas.
 
 Kernel
 Omarchy

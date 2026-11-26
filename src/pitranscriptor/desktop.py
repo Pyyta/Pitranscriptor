@@ -54,7 +54,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pitranscriptor.models import download_small, model_ready
+from pitranscriptor.models import (
+    MEDIUM_MODEL,
+    SMALL_MODEL,
+    TURBO_MODEL,
+    ModelPreset,
+    download_model,
+    model_ready,
+)
 from pitranscriptor.painting import paint_caption
 from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
 from pitranscriptor.retro_theme import (
@@ -370,9 +377,13 @@ class Editor(QMainWindow):
             file, self.t("Exportar WebVTT…", "Export WebVTT…"), lambda: self.export_text("vtt")
         )
         self._action(file, self.t("Exportar video…", "Export video…"), self.export_movie)
-        self._action(
-            file, self.t("Descargar modelo Small…", "Download Small model…"), self.install_model
-        )
+        models = file.addMenu(self.t("Modelos locales", "Local models"))
+        for preset in (SMALL_MODEL, MEDIUM_MODEL, TURBO_MODEL):
+            self._action(
+                models,
+                self.t(f"Usar o descargar {preset.name}…", f"Use or download {preset.name}…"),
+                lambda checked=False, value=preset: self.install_model(value),
+            )
         edit = self.menuBar().addMenu(self.t("Editar", "Edit"))
         self._action(edit, self.t("Deshacer", "Undo"), self.undo, QKeySequence.StandardKey.Undo)
         self._action(edit, self.t("Rehacer", "Redo"), self.redo, QKeySequence.StandardKey.Redo)
@@ -421,7 +432,8 @@ class Editor(QMainWindow):
         toolbar = QHBoxLayout(tray)
         toolbar.setContentsMargins(7, 6, 7, 6)
         toolbar.addWidget(self._button(self.t("Abrir video", "Open video"), self.open_video))
-        toolbar.addWidget(self._button(self.t("Modelo…", "Model…"), self.choose_model))
+        self.model_button = self._button(self.t("Modelo…", "Model…"), self.choose_model)
+        toolbar.addWidget(self.model_button)
         self.language_mode = self._combo(
             [("Español", "es"), ("Español + English", "mixed"), ("English", "en"), ("Auto", None)]
         )
@@ -450,12 +462,15 @@ class Editor(QMainWindow):
         storage = QStandardPaths.writableLocation(
             QStandardPaths.StandardLocation.AppLocalDataLocation
         )
-        self.download_path = Path(storage) / "models" / "faster-whisper-small"
-        workspace_model = Path("models/faster-whisper-small")
+        self.model_storage = Path(storage) / "models"
+        workspace_model = Path("models") / SMALL_MODEL.directory
         default_model = (
-            workspace_model.resolve() if model_ready(workspace_model) else self.download_path
+            workspace_model.resolve()
+            if model_ready(workspace_model)
+            else self.model_storage / SMALL_MODEL.directory
         )
         self.model_path = Path(self.settings.value("model", str(default_model)))
+        self.model_button.setToolTip(str(self.model_path))
         self.prompt = None
         self.technical_terms = tuple(self.settings.value("technicalTerms", [], type=list))
         self.update_hints_button()
@@ -833,28 +848,30 @@ class Editor(QMainWindow):
             self, self.t("Carpeta del modelo local", "Local model folder")
         )
         if path:
-            self.model_path = Path(path)
-            self.settings.setValue("model", path)
+            self.use_model(Path(path))
             self.statusBar().showMessage(path)
 
-    def install_model(self):
+    def install_model(self, preset: ModelPreset = SMALL_MODEL):
         if self.job is not None:
             return
-        if model_ready(self.download_path):
-            self.use_model(self.download_path)
-            return
+        destination = self.model_storage / preset.directory
+        local_candidates = (destination, self.model_path.parent / preset.directory)
+        for candidate in local_candidates:
+            if model_ready(candidate):
+                self.use_model(candidate)
+                return
         answer = QMessageBox.question(
             self,
             "Pitranscriptor",
             self.t(
-                "¿Descargar el modelo multilingüe Small (aprox. 490 MB)?",
-                "Download the multilingual Small model (about 490 MB)?",
+                f"¿Descargar el modelo multilingüe {preset.name} (aprox. {preset.size_mb} MB)?",
+                f"Download the multilingual {preset.name} model (about {preset.size_mb} MB)?",
             ),
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.start_job(
-            lambda progress, cancelled: download_small(self.download_path),
+            lambda progress, cancelled: download_model(preset, destination),
             self.use_model,
             can_cancel=False,
         )
@@ -863,6 +880,7 @@ class Editor(QMainWindow):
     def use_model(self, path):
         self.model_path = path
         self.settings.setValue("model", str(path))
+        self.model_button.setToolTip(str(path))
         self.statusBar().showMessage(self.t("Modelo local disponible.", "Local model is ready."))
 
     def export_movie(self):

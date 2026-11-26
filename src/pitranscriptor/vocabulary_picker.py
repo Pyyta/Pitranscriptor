@@ -59,6 +59,27 @@ class VocabularyPicker(QDialog):
         columns.addLayout(selected_panel, 1)
         body.addLayout(columns, 1)
 
+        custom_row = QHBoxLayout()
+        custom_label = QLabel(self.t("Pista propia", "Custom hint"))
+        self.custom = QLineEdit()
+        self.custom.setMaxLength(100)
+        self.custom.setAccessibleName(custom_label.text())
+        custom_label.setBuddy(self.custom)
+        self.custom_button = QPushButton(self.t("Añadir pista", "Add hint"))
+        self.custom_button.setAutoDefault(False)
+        custom_row.addWidget(custom_label)
+        custom_row.addWidget(self.custom, 1)
+        custom_row.addWidget(self.custom_button)
+        body.addLayout(custom_row)
+
+        usage = QLabel(
+            self.t(
+                "Las pistas activas orientan al modelo. Elige las que esperas oír en este audio.",
+                "Active hints guide the model. Choose the ones you expect to hear in this audio.",
+            )
+        )
+        usage.setWordWrap(True)
+        body.addWidget(usage)
         self.notice = QLabel()
         self.notice.setWordWrap(True)
         body.addWidget(self.notice)
@@ -71,6 +92,9 @@ class VocabularyPicker(QDialog):
         actions.rejected.connect(self.reject)
         self.search.textChanged.connect(self.refresh_available)
         self.category.currentIndexChanged.connect(self.refresh_available)
+        self.custom.textChanged.connect(self.update_buttons)
+        self.custom.returnPressed.connect(self.add_custom_term)
+        self.custom_button.clicked.connect(self.add_custom_term)
         self.available.itemSelectionChanged.connect(self.update_buttons)
         self.active.itemSelectionChanged.connect(self.update_buttons)
         self.add_button.clicked.connect(lambda: self.add_terms())
@@ -86,7 +110,7 @@ class VocabularyPicker(QDialog):
     def refresh_available(self):
         category = self.category.currentData()
         search = self.search.text().strip().casefold()
-        selected = set(self.selected_terms())
+        selected = {term.casefold() for term in self.selected_terms()}
         self.available.clear()
         self.available.addItems(
             sorted(
@@ -95,7 +119,7 @@ class VocabularyPicker(QDialog):
                     for group in self.groups
                     if category is None or category == group.id
                     for term in group.terms
-                    if term not in selected and search in term.casefold()
+                    if term.casefold() not in selected and search in term.casefold()
                 ),
                 key=str.casefold,
             )
@@ -113,7 +137,22 @@ class VocabularyPicker(QDialog):
         self.add_button.setEnabled(
             size < MAX_TECHNICAL_HINTS and bool(self.available.selectedItems())
         )
+        self.custom_button.setEnabled(
+            size < MAX_TECHNICAL_HINTS and bool(self.custom.text().strip())
+        )
         self.remove_button.setEnabled(bool(self.active.selectedItems()))
+
+    def add_custom_term(self):
+        term = " ".join(self.custom.text().split())
+        if not term:
+            return
+        if term.casefold() in {active.casefold() for active in self.selected_terms()}:
+            self.notice.setText(
+                self.t("Esta pista ya está activa.", "This hint is already active.")
+            )
+            return
+        if self.add_terms([term]):
+            self.custom.clear()
 
     def add_terms(self, terms=None):
         if terms is None:
@@ -125,10 +164,11 @@ class VocabularyPicker(QDialog):
                     f"Choose up to {MAX_TECHNICAL_HINTS} active hints per transcription.",
                 )
             )
-            return
+            return False
         self.active.addItems(terms)
         self.notice.clear()
         self.refresh_available()
+        return True
 
     def remove_terms(self, items=None):
         for item in self.active.selectedItems() if items is None else items:

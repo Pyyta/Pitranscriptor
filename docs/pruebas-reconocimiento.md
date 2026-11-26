@@ -125,3 +125,18 @@ En la muestra natural inicial de 39 palabras, el modo mixto sin pistas produjo 1
 El 25 de noviembre de 2026 se revisaron dos servicios que publican opciones de transcripción multilingüe. Groq documenta una cuota gratuita y marcas temporales, pero sus condiciones de servicio exigen ser mayor de edad. Cloudflare Workers AI publica una cuota gratuita compartida y un modelo que acepta pistas y devuelve segmentos. Su integración requiere una cuenta y comprobar con una llamada autorizada la granularidad de los tiempos que entrega. [Transcripción de Groq](https://console.groq.com/docs/speech-to-text), [condiciones de Groq](https://console.groq.com/docs/legal/services-agreement), [cuota de Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) y [modelo de Cloudflare](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/).
 
 La evaluación se limitó a la documentación pública. La aplicación conserva como ruta disponible el reconocimiento local. Para considerar una integración, deben verificarse elegibilidad, consentimiento previo al envío, marcas por palabra, límites y precisión frente a la opción local.
+
+## Ensayo dirigido de palabras comunes y nombres técnicos
+
+Se comparó un pasaje de una grabación propia que contiene «solito» y «Zypper». Se procesó el video completo localmente en español y se revisaron las dos palabras cerca del segundo 26. Los modelos corresponden a las mismas revisiones de la comparación anterior y se mantuvieron VAD, marcas por palabra, beam 5 y temperatura 0. Este video carece de una referencia revisada completa en el corpus, así que los resultados del pasaje no se informan como WER global.
+
+| Modelo y dispositivo | Sin pistas | Con «Zypper» como única pista |
+| --- | --- | --- |
+| Small, CPU | `solito` y `SIPA` | `solito` y `Zypper` |
+| Small, RTX 3050 Laptop | `solit` y `SIP` | `solito` y `Zypper` |
+| Medium, RTX 3050 Laptop | `solito`, sin `Zypper` | `solito` y `Zypper` |
+| Large-v3-turbo, CPU | `solito` y `ZIP` | `solito` y `ZIP` |
+
+Con Small y CUDA también se probaron una búsqueda más amplia, temperatura con reintentos, contexto del segmento anterior y otros parámetros del detector de voz. Ninguno recuperó más palabras objetivo que la pista breve con la configuración habitual. Una frase técnica larga usada como pista recuperó `Zypper` pero perdió `solito` en ese pasaje.
+
+Se procesaron además 15 frases sintéticas locales, con tres voces de Windows y 228 palabras de referencia. Small en CPU recuperó las nueve apariciones de `solito` tanto sin pistas como con pistas. En el mismo ensayo recuperó 0/9 apariciones de `Zypper` sin pistas y 7/9 con listas breves que incluían `Zypper`. Esas listas también generaron dos apariciones fuera de los pasajes esperados, donde se dijo «zíper». Los ejemplos sintéticos sirven para comprobar funcionamiento y sesgo. Hace falta audio natural adicional con referencias independientes para evaluar una mejora general.

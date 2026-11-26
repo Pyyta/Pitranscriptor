@@ -253,7 +253,7 @@
       "dnf",
       "yum",
       "rpm",
-      "zypper",
+      "Zypper",
       "pacman",
       "AUR",
       "yay",
