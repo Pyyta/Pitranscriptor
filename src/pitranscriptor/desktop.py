@@ -7,6 +7,7 @@ import os
 import sys
 import wave
 from bisect import bisect_right
+from contextlib import ExitStack
 from dataclasses import asdict, replace
 from fractions import Fraction
 from pathlib import Path
@@ -18,6 +19,7 @@ from PySide6.QtCore import (
     QPointF,
     QRectF,
     QSettings,
+    QSignalBlocker,
     QStandardPaths,
     Qt,
     QThread,
@@ -63,7 +65,14 @@ from pitranscriptor.models import (
     model_ready,
 )
 from pitranscriptor.painting import paint_caption
-from pitranscriptor.project import Project, edit_cue, load_project, save_project, write_text
+from pitranscriptor.project import (
+    Project,
+    edit_cue,
+    load_project,
+    retime_cue,
+    save_project,
+    write_text,
+)
 from pitranscriptor.retro_theme import (
     CLIP,
     GRID,
@@ -555,14 +564,10 @@ class Editor(QMainWindow):
         side_layout.addWidget(self.list, 1)
         buttons = QHBoxLayout()
         buttons.addWidget(self._button(self.t("Añadir", "Add"), self.add_cue))
-        self.single_caption_buttons = []
-        for label, action in (
-            (self.t("Dividir", "Split"), self.split_cue),
-            (self.t("Unir", "Join"), self.join_cue),
-            (self.t("Duplicar", "Duplicate"), self.duplicate_cue),
-        ):
-            button = self._button(label, action)
-            self.single_caption_buttons.append(button)
+        self.split_button = self._button(self.t("Dividir", "Split"), self.split_cue)
+        self.join_button = self._button(self.t("Unir", "Join"), self.join_cue)
+        self.duplicate_button = self._button(self.t("Duplicar", "Duplicate"), self.duplicate_cue)
+        for button in (self.split_button, self.join_button, self.duplicate_button):
             buttons.addWidget(button)
         self.delete_button = self._button(self.t("Borrar", "Delete"), self.remove_cue)
         buttons.addWidget(self.delete_button)
@@ -570,8 +575,17 @@ class Editor(QMainWindow):
         fields = QWidget()
         fields.setObjectName("inspector")
         form = QFormLayout(fields)
+        self.property_checks = {}
+        self.batch_help = QLabel(
+            self.t(
+                "Marca los campos que quieres aplicar. Se muestran los valores del primero.",
+                "Mark the properties to apply. Fields show the first caption.",
+            )
+        )
+        self.batch_help.setWordWrap(True)
+        form.addRow(self.batch_help)
         self.text = QLineEdit()
-        form.addRow(self.t("Texto", "Text"), self.text)
+        self.inspector_row(form, self.t("Texto", "Text"), "text")
         self.start = QDoubleSpinBox()
         self.end = QDoubleSpinBox()
         for spin in (self.start, self.end):
@@ -579,20 +593,16 @@ class Editor(QMainWindow):
             spin.setDecimals(3)
             spin.setSingleStep(0.05)
             spin.setSuffix(" s")
-        times = QHBoxLayout()
-        times.addWidget(self.start)
-        times.addWidget(self.end)
-        form.addRow(self.t("Inicio / fin", "Start / end"), times)
+        self.times_label = self.inspector_row(
+            form, self.t("Inicio / fin", "Start / end"), "start", "end"
+        )
         self.speaker = QLineEdit()
-        form.addRow(self.t("Hablante", "Speaker"), self.speaker)
+        self.inspector_row(form, self.t("Hablante", "Speaker"), "speaker")
         self.font = QFontComboBox()
         self.font.setMinimumWidth(100)
         self.size = QSpinBox()
         self.size.setRange(12, 200)
-        fonts = QHBoxLayout()
-        fonts.addWidget(self.font, 1)
-        fonts.addWidget(self.size)
-        form.addRow(self.t("Fuente / tamaño", "Font / size"), fonts)
+        self.inspector_row(form, self.t("Fuente / tamaño", "Font / size"), "font", "size")
         self.x = QDoubleSpinBox()
         self.y = QDoubleSpinBox()
         self.opacity = QDoubleSpinBox()
@@ -600,25 +610,21 @@ class Editor(QMainWindow):
             spin.setRange(0, 1)
             spin.setSingleStep(0.01)
             spin.setDecimals(3)
-        position = QHBoxLayout()
-        position.addWidget(self.x)
-        position.addWidget(self.y)
-        form.addRow(self.t("Posición X / Y", "Position X / Y"), position)
+        self.inspector_row(form, self.t("Posición X / Y", "Position X / Y"), "x", "y")
         self.color = QLineEdit()
         self.background = QLineEdit()
         self.outline = QLineEdit()
         self.highlight = QLineEdit()
-        form.addRow(
-            self.t("Texto / fondo", "Text / fill"), self._fields(self.color, self.background)
+        self.inspector_row(
+            form, self.t("Color / fondo", "Text color / fill"), "color", "background"
         )
-        form.addRow(
-            self.t("Contorno / resaltado", "Outline / highlight"),
-            self._fields(self.outline, self.highlight),
+        self.inspector_row(
+            form, self.t("Contorno / resaltado", "Outline / highlight"), "outline", "highlight"
         )
-        form.addRow(self.t("Opacidad de fondo", "Fill opacity"), self.opacity)
+        self.inspector_row(form, self.t("Opacidad de fondo", "Fill opacity"), "opacity")
         self.bold = QCheckBox(self.t("Negrita", "Bold"))
         self.shadow = QCheckBox(self.t("Sombra", "Shadow"))
-        form.addRow(self._fields(self.bold, self.shadow))
+        self.inspector_row(form, self.t("Grosor / sombra", "Weight / shadow"), "bold", "shadow")
         self.align = self._combo(
             [
                 (self.t(es, en), key)
@@ -640,22 +646,20 @@ class Editor(QMainWindow):
                 )
             ]
         )
-        form.addRow(
-            self.t("Alineación / efecto", "Align / effect"), self._fields(self.align, self.effect)
-        )
-        form.addRow(
-            self._fields(
-                self._button(self.t("Aplicar", "Apply"), self.apply_fields),
-                self._button(self.t("Tiempos de palabras…", "Word times…"), self.edit_word),
-            )
+        self.inspector_row(form, self.t("Alineación / efecto", "Align / effect"), "align", "effect")
+        self.apply_button = self._button(self.t("Aplicar", "Apply"), self.apply_fields)
+        self.word_button = self._button(
+            self.t("Tiempos de palabras…", "Word times…"), self.edit_word
         )
         self.inspector = QScrollArea()
         self.inspector.setWidgetResizable(True)
         self.inspector.setWidget(fields)
-        side_layout.addWidget(
-            self.panel_title(self.t("Propiedades del fragmento", "Caption properties"))
+        self.property_title = self.panel_title(
+            self.t("Propiedades del fragmento", "Caption properties")
         )
+        side_layout.addWidget(self.property_title)
         side_layout.addWidget(self.inspector, 2)
+        side_layout.addLayout(self._fields(self.apply_button, self.word_button))
         split.addWidget(side)
         split.setSizes([720, 475])
         self.statusBar().showMessage(self.t("Creado por sudo_pita", "Created by sudo_pita"))
@@ -680,6 +684,30 @@ class Editor(QMainWindow):
         for widget in widgets:
             row.addWidget(widget)
         return row
+
+    def inspector_row(self, form, title, *names):
+        row = QHBoxLayout()
+        for name, label in zip(names, title.split(" / "), strict=True):
+            control = getattr(self, name)
+            check = QCheckBox()
+            check.setAccessibleName(self.t(f"Aplicar {label}", f"Apply {label}"))
+            self.property_checks[name] = check
+            row.addWidget(check)
+            row.addWidget(control, 1)
+            if isinstance(control, QFontComboBox):
+                changed = control.currentFontChanged
+            elif isinstance(control, QComboBox):
+                changed = control.currentIndexChanged
+            elif isinstance(control, QLineEdit):
+                changed = control.textChanged
+            elif isinstance(control, QCheckBox):
+                changed = control.toggled
+            else:
+                changed = control.valueChanged
+            changed.connect(lambda *_, toggle=check: toggle.setChecked(True))
+        label = QLabel(title)
+        form.addRow(label, row)
+        return label
 
     def about(self):
         QMessageBox.about(
@@ -1174,9 +1202,9 @@ class Editor(QMainWindow):
         self.preview.update()
 
     def current_cue(self):
-        selected = self.list.selectedIndexes()
-        if self.project and len(selected) == 1:
-            return self.project.cues[selected[0].row()]
+        rows = self.selected_rows()
+        if self.project and rows:
+            return self.project.cues[rows[0]]
         return None
 
     def selected_rows(self):
@@ -1199,8 +1227,9 @@ class Editor(QMainWindow):
             self.list.scrollToItem(self.list.item(rows[0]))
         self.select_cue(seek=seek)
 
-    def refresh(self, index=None):
-        rows = self.selected_rows()
+    def refresh(self, index=None, *, rows=None):
+        if rows is None:
+            rows = self.selected_rows()
         self.list.blockSignals(True)
         self.list.clear()
         self.timeline.cues = self.project.cues if self.project else ()
@@ -1233,9 +1262,10 @@ class Editor(QMainWindow):
             if count > 1
             else self.t("Fragmentos", "Captions")
         )
-        self.inspector.setEnabled(count == 1)
-        for button in self.single_caption_buttons:
-            button.setEnabled(count == 1)
+        self.inspector.setEnabled(count > 0)
+        self.split_button.setEnabled(count > 0)
+        self.join_button.setEnabled(count > 0)
+        self.duplicate_button.setEnabled(count > 0)
         self.delete_button.setEnabled(count > 0)
         cue = self.current_cue()
         if count == 1 and self.list.currentRow() != rows[0]:
@@ -1243,36 +1273,81 @@ class Editor(QMainWindow):
             self.list.selectionModel().setCurrentIndex(
                 index, QItemSelectionModel.SelectionFlag.NoUpdate
             )
-        self.text.setText(cue.text if cue else "")
-        self.speaker.setText(cue.speaker if cue else "")
-        self.start.setValue(cue.start_ms / 1000 if cue else 0)
-        self.end.setValue(cue.end_ms / 1000 if cue else 0)
-        style = cue.style if cue else Style()
-        self.font.setCurrentFont(QFont(style.font) if style.font else QApplication.font())
-        self.size.setValue(style.size)
-        self.opacity.setValue(style.opacity)
-        self.x.setValue(style.x)
-        self.y.setValue(style.y)
-        self.color.setText(style.color)
-        self.background.setText(style.background)
-        self.outline.setText(style.outline)
-        self.highlight.setText(style.highlight)
-        self.bold.setChecked(style.bold)
-        self.shadow.setChecked(style.shadow)
-        self.align.setCurrentIndex(self.align.findData(style.align))
-        self.effect.setCurrentIndex(self.effect.findData(style.effect))
+        self.load_inspector(cue, rows)
         if seek and cue:
             self.player.pause()
             self.player.setPosition(cue.start_ms)
         self.update_playhead(self.player.position())
 
-    def commit(self, project, index):
+    def load_inspector(self, cue, rows):
+        multiple = len(rows) > 1
+        self.batch_help.setVisible(multiple)
+        self.property_title.setText(
+            self.t("Propiedades de la selección", "Selection properties")
+            if multiple
+            else self.t("Propiedades del fragmento", "Caption properties")
+        )
+        self.apply_button.setEnabled(bool(rows))
+        self.times_label.setText(
+            self.t("Ajuste inicio / fin", "Shift start / end")
+            if multiple
+            else self.t("Inicio / fin", "Start / end")
+        )
+        selected = tuple(self.project.cues[row] for row in rows)
+        for name, check in self.property_checks.items():
+            check.setChecked(False)
+            check.setVisible(multiple)
+            mixed = multiple and len({self.inspector_value(cue, name) for cue in selected}) > 1
+            check.setToolTip(
+                self.t("Valores distintos en la selección", "Values differ across selection")
+                if mixed
+                else check.accessibleName()
+            )
+        self.word_button.setEnabled(bool(selected) and all(item.words for item in selected))
+        self.apply_button.setText(
+            self.t("Aplicar a selección", "Apply to selection")
+            if multiple
+            else self.t("Aplicar", "Apply")
+        )
+        with ExitStack() as blocked:
+            for name in self.property_checks:
+                blocked.enter_context(QSignalBlocker(getattr(self, name)))
+            for spin in (self.start, self.end):
+                spin.setMinimum(-300 if multiple else 0)
+            self.text.setText(cue.text if cue else "")
+            self.speaker.setText(cue.speaker if cue else "")
+            self.start.setValue(cue.start_ms / 1000 if cue and not multiple else 0)
+            self.end.setValue(cue.end_ms / 1000 if cue and not multiple else 0)
+            style = cue.style if cue else Style()
+            self.font.setCurrentFont(QFont(style.font) if style.font else QApplication.font())
+            self.size.setValue(style.size)
+            self.opacity.setValue(style.opacity)
+            self.x.setValue(style.x)
+            self.y.setValue(style.y)
+            self.color.setText(style.color)
+            self.background.setText(style.background)
+            self.outline.setText(style.outline)
+            self.highlight.setText(style.highlight)
+            self.bold.setChecked(style.bold)
+            self.shadow.setChecked(style.shadow)
+            self.align.setCurrentIndex(self.align.findData(style.align))
+            self.effect.setCurrentIndex(self.effect.findData(style.effect))
+
+    @staticmethod
+    def inspector_value(cue, name):
+        if name in ("start", "end"):
+            return getattr(cue, f"{name}_ms")
+        if name in ("text", "speaker"):
+            return getattr(cue, name)
+        return getattr(cue.style, name)
+
+    def commit(self, project, index=None, *, rows=None):
         if project == self.project:
             return
         self.before.append(self.project)
         self.after.clear()
         self.project = project
-        self.refresh(index)
+        self.refresh(index, rows=rows)
 
     def undo(self):
         if self.before and self.job is None:
@@ -1296,81 +1371,157 @@ class Editor(QMainWindow):
         except ValueError as error:
             self.show_error(error)
 
+    def commit_batch(self, replacements, selection):
+        cues = (
+            cue
+            for index, original in enumerate(self.project.cues)
+            for cue in replacements.get(index, (original,))
+        )
+        project = self.project.with_cues(cues)
+        starts = {cue.start_ms for cue in selection}
+        rows = tuple(i for i, cue in enumerate(project.cues) if cue.start_ms in starts)
+        self.commit(project, rows=rows)
+
+    def edit_selected(self, edit):
+        rows = self.selected_rows()
+        if not rows or self.job is not None:
+            return
+        try:
+            updates = {row: (edit(self.project.cues[row]),) for row in rows}
+            self.commit_batch(updates, (update[0] for update in updates.values()))
+        except ValueError as error:
+            self.show_error(error)
+
     def apply_fields(self):
         cue = self.current_cue()
         if cue is None:
             return
-        try:
-            font = self.font.currentFont().family()
-            if font == QApplication.font().family() and not cue.style.font:
-                font = ""
-            style = Style(
-                x=self.x.value(),
-                y=self.y.value(),
-                size=self.size.value(),
-                color=self.color.text(),
-                background=self.background.text(),
-                opacity=self.opacity.value(),
-                bold=self.bold.isChecked(),
-                font=font,
-                outline=self.outline.text(),
-                shadow=self.shadow.isChecked(),
-                align=self.align.currentData(),
-                highlight=self.highlight.text(),
-                effect=self.effect.currentData(),
+        font = self.font.currentFont().family()
+        if font == QApplication.font().family() and not cue.style.font:
+            font = ""
+        styles = dict(
+            x=self.x.value(),
+            y=self.y.value(),
+            size=self.size.value(),
+            color=self.color.text(),
+            background=self.background.text(),
+            opacity=self.opacity.value(),
+            bold=self.bold.isChecked(),
+            font=font,
+            outline=self.outline.text(),
+            shadow=self.shadow.isChecked(),
+            align=self.align.currentData(),
+            highlight=self.highlight.text(),
+            effect=self.effect.currentData(),
+        )
+        multiple = len(self.selected_rows()) > 1
+        marked = {name for name, check in self.property_checks.items() if check.isChecked()}
+        if multiple:
+            styles = {name: value for name, value in styles.items() if name in marked}
+        start = round(self.start.value() * 1000)
+        end = round(self.end.value() * 1000)
+        text = self.text.text()
+        speaker = self.speaker.text()
+
+        def edit(original):
+            if multiple:
+                if marked & {"start", "end"}:
+                    original = retime_cue(
+                        original,
+                        original.start_ms + (start if "start" in marked else 0),
+                        original.end_ms + (end if "end" in marked else 0),
+                    )
+                changed = (
+                    edit_cue(original, text, original.start_ms, original.end_ms)
+                    if "text" in marked
+                    else original
+                )
+            else:
+                changed = edit_cue(original, text, start, end)
+            return replace(
+                changed,
+                style=replace(changed.style, **styles),
+                speaker=speaker if not multiple or "speaker" in marked else changed.speaker,
             )
-            new = edit_cue(
-                cue,
-                self.text.text(),
-                round(self.start.value() * 1000),
-                round(self.end.value() * 1000),
-            )
-            self.splice(
-                self.list.currentRow(), 1, [replace(new, style=style, speaker=self.speaker.text())]
-            )
-        except ValueError as error:
-            self.show_error(error)
+
+        self.edit_selected(edit)
 
     def move_caption(self, x, y):
-        cue = self.current_cue()
-        if cue:
-            new = replace(cue, style=replace(cue.style, x=round(x, 3), y=round(y, 3)))
-            self.splice(self.list.currentRow(), 1, [new])
+        self.edit_selected(
+            lambda cue: replace(cue, style=replace(cue.style, x=round(x, 3), y=round(y, 3)))
+        )
 
     def edit_word(self):
-        cue = self.current_cue()
-        if not cue or not cue.words:
+        rows = self.selected_rows()
+        if not rows or self.job is not None:
+            return
+        cues = tuple(self.project.cues[row] for row in rows)
+        count = min(len(cue.words) for cue in cues)
+        if count == 0:
             self.statusBar().showMessage(
                 self.t(
-                    "Este fragmento no tiene marcas por palabra.", "This caption has no word times."
+                    "La edición requiere marcas por palabra en cada fragmento seleccionado.",
+                    "Word times are required on every selected caption.",
                 )
             )
             return
-        choices = [f"{i + 1} · {word.text}" for i, word in enumerate(cue.words)]
+        multiple = len(rows) > 1
+        choices = [
+            str(index + 1) if multiple else f"{index + 1} · {cues[0].words[index].text}"
+            for index in range(count)
+        ]
         chosen, ok = QInputDialog.getItem(
-            self, "Pitranscriptor", self.t("Palabra", "Word"), choices, 0, False
+            self,
+            "Pitranscriptor",
+            self.t("Número de palabra en cada fragmento", "Word number in each caption")
+            if multiple
+            else self.t("Palabra", "Word"),
+            choices,
+            0,
+            False,
         )
         if not ok:
             return
         index = choices.index(chosen)
-        word = cue.words[index]
+        word = cues[0].words[index]
         value, ok = QInputDialog.getText(
             self,
             "Pitranscriptor",
             self.t(
+                "Ajustes de inicio y fin en ms, separados por coma",
+                "Start and end shifts in ms, separated by a comma",
+            )
+            if multiple
+            else self.t(
                 "Inicio y fin en ms, separados por coma",
                 "Start and end in ms, separated by a comma",
             ),
-            text=f"{word.start_ms}, {word.end_ms}",
+            text="0, 0" if multiple else f"{word.start_ms}, {word.end_ms}",
         )
-        if ok:
-            try:
-                start, end = (int(part.strip()) for part in value.split(","))
-                words = list(cue.words)
-                words[index] = replace(word, start_ms=start, end_ms=end)
-                self.splice(self.list.currentRow(), 1, [replace(cue, words=tuple(words))])
-            except ValueError as error:
-                self.show_error(error)
+        if not ok:
+            return
+        try:
+            start, end = (int(part.strip()) for part in value.split(","))
+        except ValueError:
+            self.show_error(
+                self.t(
+                    "Escribe dos enteros separados por coma.",
+                    "Enter two integers separated by a comma.",
+                )
+            )
+            return
+
+        def edit(cue):
+            words = list(cue.words)
+            original = words[index]
+            words[index] = replace(
+                original,
+                start_ms=start + (original.start_ms if multiple else 0),
+                end_ms=end + (original.end_ms if multiple else 0),
+            )
+            return replace(cue, words=tuple(words))
+
+        self.edit_selected(edit)
 
     def add_cue(self):
         if self.project is None:
@@ -1399,77 +1550,104 @@ class Editor(QMainWindow):
                 self.show_error(error)
 
     def split_cue(self):
-        cue = self.current_cue()
-        if not cue or len(cue.text.split()) < 2:
+        rows = self.selected_rows()
+        if not rows or self.job is not None:
             return
-        tokens = cue.text.split()
+        cues = tuple(self.project.cues[row] for row in rows)
+        shortest = min(len(cue.text.split()) for cue in cues)
+        if shortest < 2:
+            self.show_error(
+                self.t(
+                    "Cada fragmento seleccionado necesita al menos dos palabras para dividirlo.",
+                    "Each selected caption needs at least two words to split it.",
+                )
+            )
+            return
         number, ok = QInputDialog.getInt(
             self,
             "Pitranscriptor",
-            self.t("Dividir después de la palabra", "Split after word"),
-            len(tokens) // 2,
+            self.t("Dividir después de la palabra indicada", "Split after this word number"),
+            shortest // 2,
             1,
-            len(tokens) - 1,
+            shortest - 1,
         )
         if not ok:
             return
-        boundary = cue.words[number].start_ms if cue.words else (cue.start_ms + cue.end_ms) // 2
         try:
-            left = replace(
-                cue, end_ms=boundary, text=" ".join(tokens[:number]), words=cue.words[:number]
+            replacements = {}
+            for row, cue in zip(rows, cues, strict=True):
+                tokens = cue.text.split()
+                boundary = (
+                    cue.words[number].start_ms if cue.words else (cue.start_ms + cue.end_ms) // 2
+                )
+                left = replace(
+                    cue, end_ms=boundary, text=" ".join(tokens[:number]), words=cue.words[:number]
+                )
+                right = replace(
+                    cue, start_ms=boundary, text=" ".join(tokens[number:]), words=cue.words[number:]
+                )
+                replacements[row] = (left, right)
+            selected = (
+                piece
+                for pair in replacements.values()
+                for piece in (pair if len(rows) > 1 else pair[:1])
             )
-            right = replace(
-                cue, start_ms=boundary, text=" ".join(tokens[number:]), words=cue.words[number:]
-            )
-            self.splice(self.list.currentRow(), 1, [left, right])
+            self.commit_batch(replacements, selected)
         except ValueError as error:
             self.show_error(error)
 
     def join_cue(self):
-        cue = self.current_cue()
-        index = self.list.currentRow()
-        if not cue or index + 1 >= len(self.project.cues):
+        rows = self.selected_rows()
+        if not rows or self.job is not None:
             return
-        other = self.project.cues[index + 1]
+        first = rows[0]
+        last = rows[-1] if len(rows) > 1 else first + 1
+        if last >= len(self.project.cues):
+            return
+        if len(rows) > 1 and len(rows) != last - first + 1:
+            self.show_error(
+                self.t(
+                    "Selecciona fragmentos consecutivos para unirlos.",
+                    "Select consecutive captions to join them.",
+                )
+            )
+            return
+        cues = self.project.cues[first : last + 1]
         try:
             merged = replace(
-                cue,
-                end_ms=other.end_ms,
-                text=f"{cue.text} {other.text}",
-                words=cue.words + other.words if cue.words and other.words else (),
+                cues[0],
+                end_ms=cues[-1].end_ms,
+                text=" ".join(cue.text for cue in cues),
+                words=tuple(word for cue in cues for word in cue.words)
+                if all(cue.words for cue in cues)
+                else (),
             )
-            self.splice(index, 2, [merged])
+            self.splice(first, len(cues), [merged])
         except ValueError as error:
             self.show_error(error)
 
     def duplicate_cue(self):
-        cue = self.current_cue()
-        if not cue:
+        rows = self.selected_rows()
+        if not rows or self.job is not None:
             return
-        index = self.list.currentRow()
-        limit = (
-            self.project.cues[index + 1].start_ms
-            if index + 1 < len(self.project.cues)
-            else self.project.duration_ms
-        )
-        duration = cue.end_ms - cue.start_ms
-        if cue.end_ms + duration > limit:
-            self.show_error(
-                self.t(
-                    "No hay espacio para una copia después del fragmento.",
-                    "There is no room for a copy after this caption.",
-                )
-            )
-            return
-        words = tuple(
-            replace(word, start_ms=word.start_ms + duration, end_ms=word.end_ms + duration)
-            for word in cue.words
-        )
-        self.splice(
-            index + 1,
-            0,
-            [replace(cue, start_ms=cue.end_ms, end_ms=cue.end_ms + duration, words=words)],
-        )
+        cues = self.project.cues
+        replacements = {}
+        try:
+            for row in rows:
+                cue = cues[row]
+                limit = cues[row + 1].start_ms if row + 1 < len(cues) else self.project.duration_ms
+                end = cue.end_ms + (cue.end_ms - cue.start_ms)
+                if end > limit:
+                    raise ValueError(
+                        self.t(
+                            f"No hay espacio para una copia después del fragmento {row + 1}.",
+                            f"There is no room for a copy after caption {row + 1}.",
+                        )
+                    )
+                replacements[row] = (cue, retime_cue(cue, cue.end_ms, end))
+            self.commit_batch(replacements, (copy for _, copy in replacements.values()))
+        except ValueError as error:
+            self.show_error(error)
 
     def remove_cue(self):
         if self.project is None or self.job is not None:
@@ -1500,14 +1678,13 @@ class Editor(QMainWindow):
             self.settings.setValue("presets", json.dumps(presets, ensure_ascii=False))
 
     def apply_preset(self):
-        cue = self.current_cue()
         presets = json.loads(self.settings.value("presets", "{}"))
-        if cue and presets:
+        if self.selected_rows() and presets and self.job is None:
             name, ok = QInputDialog.getItem(
                 self, "Pitranscriptor", "Preset", sorted(presets), 0, False
             )
             if ok:
-                self.splice(self.list.currentRow(), 1, [replace(cue, style=Style(**presets[name]))])
+                self.edit_selected(lambda cue: replace(cue, style=Style(**presets[name])))
 
     def review_fillers(self):
         if self.project is None or self.job is not None:

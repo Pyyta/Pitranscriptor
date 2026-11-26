@@ -42,6 +42,20 @@ def edit_cue(cue: Cue, text: str, start_ms: int, end_ms: int) -> Cue:
     return replace(cue, text=" ".join(tokens), start_ms=start_ms, end_ms=end_ms, words=words)
 
 
+def retime_cue(cue: Cue, start_ms: int, end_ms: int) -> Cue:
+    """Trasladar o escalar la posición relativa de cada marca del fragmento."""
+    scale = (end_ms - start_ms) / (cue.end_ms - cue.start_ms)
+    words = tuple(
+        replace(
+            word,
+            start_ms=start_ms + round((word.start_ms - cue.start_ms) * scale),
+            end_ms=start_ms + round((word.end_ms - cue.start_ms) * scale),
+        )
+        for word in cue.words
+    )
+    return replace(cue, start_ms=start_ms, end_ms=end_ms, words=words)
+
+
 def write_text(path: Path, content: str, *, overwrite: bool = False) -> None:
     """Publicar un archivo completo y preservar los destinos existentes por defecto."""
     with NamedTemporaryFile(
