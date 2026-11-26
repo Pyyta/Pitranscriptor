@@ -84,6 +84,7 @@ from pitranscriptor.retro_theme import (
     WORKSPACE,
     retro_palette,
 )
+from pitranscriptor.review import compare_readings
 from pitranscriptor.subtitles import Cue, Style, render_subtitles
 from pitranscriptor.transcription import DEFAULT_RIGOR, inspect_media
 from pitranscriptor.transcription_job import WORKER_FLAG, run_transcription, worker
@@ -406,6 +407,11 @@ class Editor(QMainWindow):
             edit,
             self.t("Revisar palabras dudosas…", "Review uncertain words…"),
             self.review_uncertain,
+        )
+        self._action(
+            edit,
+            self.t("Revisar palabras en contexto…", "Review words in context…"),
+            self.review_in_context,
         )
         self._action(edit, self.t("Colorear por hablante", "Color by speaker"), self.color_speakers)
         help_menu = self.menuBar().addMenu(self.t("Ayuda", "Help"))
@@ -1831,6 +1837,155 @@ class Editor(QMainWindow):
             self.list.setCurrentRow(index)
             self.player.setPosition(position)
             self.text.setFocus()
+
+    def review_in_context(self):
+        project = self.project
+        if project is None or self.job is not None:
+            return
+        if not any(cue.words for cue in project.cues):
+            self.statusBar().showMessage(
+                self.t(
+                    "Transcribe el video para obtener tiempos por palabra.",
+                    "Transcribe the video to get word timings.",
+                )
+            )
+            return
+        model = self.model_path
+        if not model_ready(model):
+            self.install_model()
+            return
+        language = self.language_mode.currentData()
+        device = self.device.currentData()
+        context = self.context_hint or None
+        terms = () if context else self.technical_terms
+        self.player.pause()
+        self.start_job(
+            lambda progress, cancelled: run_transcription(
+                Path(project.source),
+                model,
+                language=language,
+                device=device,
+                context_hint=context,
+                technical_terms=terms,
+                review_audio=True,
+                progress=progress,
+                cancelled=cancelled,
+            ),
+            lambda second: self.show_context_review(compare_readings(project, second)),
+        )
+        self.statusBar().showMessage(
+            self.t(
+                "Comparando la transcripción con el audio…",
+                "Comparing the transcript with the audio…",
+            )
+        )
+
+    def show_context_review(self, suggestions):
+        if not suggestions:
+            self.statusBar().showMessage(
+                self.t(
+                    "La segunda escucha no encontró alternativas aisladas.",
+                    "The second pass found no isolated alternatives.",
+                )
+            )
+            return
+        remaining = list(suggestions)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.t("Revisar palabras en contexto", "Review words in context"))
+        dialog.resize(720, 430)
+        layout = QVBoxLayout(dialog)
+        notice = QLabel(
+            self.t(
+                "Escucha el pasaje para decidir entre las dos lecturas.",
+                "Listen to the passage to decide between the two readings.",
+            )
+        )
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+        results = QListWidget()
+        results.setAccessibleName(self.t("Alternativas del audio", "Alternatives from the audio"))
+        for item in remaining:
+            results.addItem(
+                f"{timestamp(item.original.start_ms)}   {item.original.text} → {item.alternative}"
+            )
+        layout.addWidget(results, 1)
+        detail = QLabel()
+        detail.setTextFormat(Qt.TextFormat.PlainText)
+        detail.setWordWrap(True)
+        layout.addWidget(detail)
+        buttons = QDialogButtonBox()
+        listen = buttons.addButton(
+            self.t("Escuchar la frase", "Listen to the phrase"), buttons.ButtonRole.ActionRole
+        )
+        apply = buttons.addButton(
+            self.t("Usar alternativa", "Use alternative"), buttons.ButtonRole.ActionRole
+        )
+        buttons.addButton(self.t("Cerrar", "Close"), buttons.ButtonRole.RejectRole)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        playback_end = None
+
+        def stop_at_end(position):
+            if playback_end is not None and position >= playback_end:
+                self.player.pause()
+
+        def show_suggestion(row):
+            nonlocal playback_end
+            playback_end = None
+            self.player.pause()
+            listen.setEnabled(row >= 0)
+            apply.setEnabled(row >= 0)
+            if row >= 0:
+                item = remaining[row]
+                original = f"{item.before} [{item.original.text}] {item.after}"
+                alternative = f"{item.before} [{item.alternative}] {item.after}"
+                detail.setText(
+                    self.t(
+                        f"Actual: {original}\nAlternativa: {alternative}",
+                        f"Current: {original}\nAlternative: {alternative}",
+                    )
+                )
+            else:
+                detail.clear()
+
+        def listen_to_phrase():
+            nonlocal playback_end
+            item = remaining[results.currentRow()]
+            self.set_caption_selection((item.row,), False)
+            playback_end = item.listen_end
+            self.player.setPosition(item.listen_start)
+            self.player.play()
+
+        def accept_alternative():
+            row = results.currentRow()
+            item = remaining[row]
+            cue = self.project.cues[item.row]
+            tokens = cue.text.split()
+            tokens[item.word_index] = item.alternative
+            replacement = edit_cue(cue, " ".join(tokens), cue.start_ms, cue.end_ms)
+            self.splice(item.row, 1, [replacement])
+            self.player.setPosition(item.original.start_ms)
+            with QSignalBlocker(results):
+                remaining.pop(row)
+                results.takeItem(row)
+            next_row = min(row, results.count() - 1)
+            results.setCurrentRow(next_row)
+            show_suggestion(next_row)
+
+        listen.clicked.connect(listen_to_phrase)
+        apply.clicked.connect(accept_alternative)
+        results.currentRowChanged.connect(show_suggestion)
+        results.setCurrentRow(0)
+        self.player.positionChanged.connect(stop_at_end)
+        try:
+            dialog.exec()
+        finally:
+            self.player.positionChanged.disconnect(stop_at_end)
+            self.player.pause()
+            dialog.deleteLater()
+        self.statusBar().showMessage(
+            self.t("Revisión de contexto terminada.", "Context review finished.")
+        )
 
 
 def configure_application(app):

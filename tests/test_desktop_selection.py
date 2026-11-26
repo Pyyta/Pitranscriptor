@@ -6,6 +6,7 @@ import pytest
 
 from pitranscriptor.models import MODEL_FILES, SMALL_MODEL, TURBO_MODEL
 from pitranscriptor.project import Project
+from pitranscriptor.review import compare_readings
 from pitranscriptor.subtitles import Cue, Style, Word
 from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS, suggest_script_terms
 
@@ -198,6 +199,51 @@ def test_batch_word_edits_presets_and_structural_operations(caption_editor, monk
     editor.set_caption_selection((0, 2), False)
     editor.join_button.click()
     assert len(errors) == 2 and editor.project == split
+
+
+def test_confirming_a_context_suggestion_updates_one_word_and_is_undoable(
+    caption_editor, monkeypatch
+):
+    editor, errors = caption_editor
+    original = editor.project
+    cue = original.cues[1]
+    change = replace(cue.words[0], text="Tres", probability=0.8)
+    second = original.with_cues(
+        (
+            original.cues[0],
+            replace(cue, text="Tres palabras", words=(change, cue.words[1])),
+            original.cues[2],
+        )
+    )
+    suggestions = compare_readings(original, second)
+    assert len(suggestions) == 1
+
+    def review_dialog(dialog):
+        results = dialog.findChild(desktop.QListWidget)
+        assert results.count() == 1
+        assert "Dos → Tres" in results.item(0).text()
+        button = next(
+            widget
+            for widget in dialog.findChildren(desktop.QPushButton)
+            if widget.text() == "Usar alternativa"
+        )
+        button.click()
+        assert results.count() == 0
+        return desktop.QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(desktop.QDialog, "exec", review_dialog)
+    editor.show_context_review(suggestions)
+    updated = editor.project.cues[1]
+    assert (updated.text, updated.style, updated.speaker) == (
+        "Tres palabras",
+        cue.style,
+        cue.speaker,
+    )
+    assert (updated.words[0].start_ms, updated.words[0].end_ms) == (change.start_ms, change.end_ms)
+    assert updated.words[0].probability is None
+    assert editor.project.cues[0] == original.cues[0] and not errors
+    editor.undo()
+    assert editor.project == original
 
 
 def test_custom_hint_uses_same_list_and_limit_as_catalog(qt_app):

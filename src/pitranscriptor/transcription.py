@@ -1,6 +1,7 @@
 """Reconocimiento con un modelo ya instalado y marcas por palabra."""
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from math import isfinite
 from pathlib import Path
 
@@ -12,6 +13,32 @@ from pitranscriptor.vocabulary import MAX_TECHNICAL_HINTS
 
 DEFAULT_RIGOR = "balanced"
 RIGOR_BEAMS = {"fast": 1, DEFAULT_RIGOR: 5, "thorough": 10}
+
+
+def review_segments(model, audio, rate, options, progress, cancelled):
+    """Escuchar el habla en ventanas cortas con contexto en ambos extremos."""
+    audio_ms = (len(audio) * 1000 + rate - 1) // rate
+    for start in range(0, audio_ms, 3000):
+        if cancelled():
+            raise InterruptedError("Transcripción cancelada")
+        stop = min(start + 3000, audio_ms)
+        left = max(0, start - 1000)
+        right = min(audio_ms, stop + 2000)
+        clip = audio[left * rate // 1000 : right * rate // 1000]
+        if len(clip) < rate // 10:
+            continue
+        segments, _ = model.transcribe(clip, **options)
+        for segment in segments:
+            words = []
+            for word in segment.words or ():
+                position = (word.start + word.end) * 500 + left
+                if start <= position < stop:
+                    words.append(
+                        replace(word, start=word.start + left / 1000, end=word.end + left / 1000)
+                    )
+            if words:
+                yield replace(segment, words=words)
+        progress(min(99, stop * 100 // audio_ms))
 
 
 def inspect_media(source: Path, *, require_video: bool = False) -> tuple[int, int]:
@@ -69,6 +96,7 @@ def transcribe_project(
     target: int = 4,
     device: str = "cpu",
     rigor: str = DEFAULT_RIGOR,
+    review_audio: bool = False,
     progress: Callable[[int], None] = lambda percent: None,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> Project:
@@ -120,11 +148,12 @@ def transcribe_project(
             input_audio = audio
             clips = "0"
             mixed = language == "mixed"
-            if mixed:
-                if not model.model.is_multilingual:
-                    raise ValueError("El modo mixto requiere un modelo multilingüe")
+            if mixed and not model.model.is_multilingual:
+                raise ValueError("El modo mixto requiere un modelo multilingüe")
+            if mixed or review_audio:
                 rate = model.feature_extractor.sampling_rate
                 input_audio = decode_audio(audio, sampling_rate=rate)
+            if mixed and not review_audio:
                 speech = get_speech_timestamps(
                     input_audio, VadOptions(min_silence_duration_ms=180, speech_pad_ms=80), rate
                 )
@@ -138,13 +167,12 @@ def transcribe_project(
                     for interval in speech
                     for tick in (interval["start"], interval["end"])
                 ]
-            segments, _ = model.transcribe(
-                input_audio,
+            options = dict(
                 language=None if mixed else language,
                 task="transcribe",
                 word_timestamps=True,
                 multilingual=mixed,
-                vad_filter=not mixed,
+                vad_filter=not mixed and not review_audio,
                 clip_timestamps=clips,
                 beam_size=RIGOR_BEAMS[rigor],
                 temperature=0,
@@ -152,6 +180,10 @@ def transcribe_project(
                 initial_prompt=vocabulary,
                 hotwords=hotwords,
             )
+            if review_audio:
+                segments = review_segments(model, input_audio, rate, options, progress, cancelled)
+            else:
+                segments, _ = model.transcribe(input_audio, **options)
             for segment in segments:
                 if cancelled():
                     raise InterruptedError("Transcripción cancelada")
@@ -172,7 +204,8 @@ def transcribe_project(
                             Word(token, first, last, recognition_confidence(word.probability))
                         )
                     last_end = end
-                progress(min(99, last_end * 100 // duration))
+                if not review_audio:
+                    progress(min(99, last_end * 100 // duration))
     except av.FFmpegError as error:
         raise ValueError("No se pudo decodificar el audio") from error
     if cancelled():

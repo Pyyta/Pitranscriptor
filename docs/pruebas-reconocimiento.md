@@ -153,3 +153,9 @@ Se comparó una grabación de 75,4 s con un guion facilitado por el autor. La re
 | Turbo, CUDA, frases breves de contexto | 7/285 | 11/11 |
 
 Las frases se eligieron a partir del tema del guion y orientan la decodificación de cada tramo mediante `hotwords` de faster-whisper. La comparación conserva el mismo modelo Turbo, dispositivo e idioma entre las tres condiciones de CUDA. La aplicación conserva los pesos y el valor predeterminado. La opción contextual se activa por video. Las hipótesis completas, el guion y el proyecto de prueba quedan en `reports/local/`.
+
+## Revisión de palabras en contexto
+
+Una segunda pasada vuelve a decodificar ventanas cortas con audio anterior y posterior. Se muestran discrepancias aisladas cuando los tiempos y las palabras vecinas permiten emparejarlas con la transcripción. El usuario escucha el pasaje y decide si aplica la sugerencia. Esta revisión no verifica hechos y puede pasar por alto errores en los que coinciden ambas lecturas.
+
+En el video de openSUSE, Turbo y CUDA propusieron `pagar` donde la primera transcripción decía `apagar`. Una revisión independiente también propuso cambios en términos que la primera lectura ya había acertado. Con las pistas de contexto del ensayo anterior, se redujeron las propuestas a dos y todavía apareció una alternativa incorrecta. Este caso ilustra por qué las alternativas se conservan como sugerencias. La revisión usa la configuración de pistas técnicas o contexto breve que esté activa.
